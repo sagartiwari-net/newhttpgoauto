@@ -54,13 +54,17 @@ func RunSemrush() (string, string) {
 		form.Set("amember_pass", password)
 		form.Set("remember_login", "1")
 
-		finalURL, postBody, _, err := client.POST(loginURL, form.Encode(), map[string]string{
+		finalURL, postBody, postStatus, err := client.POST(loginURL, form.Encode(), map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
 			"Origin":       "https://members.azadseo.com",
 			"Referer":      memberURL,
 		})
-		if err != nil || !httpclient.LoginOK(finalURL, postBody) {
-			return "failed", "azadseo login failed"
+		if err != nil {
+			return "failed", "azadseo login POST error: " + err.Error()
+		}
+		if !httpclient.LoginOK(finalURL, postBody) {
+			reason := httpclient.LoginFailureReason(finalURL, postBody, postStatus)
+			return "failed", "azadseo login failed: " + reason
 		}
 		log.Printf("[Azad] login OK → %s", finalURL)
 	}

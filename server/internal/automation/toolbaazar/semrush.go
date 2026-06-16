@@ -58,39 +58,53 @@ func RunSemrush() (string, string) {
 		log.Printf("[Toolbaazar] restored %d portal cookies", len(saved))
 	}
 
-	body, status, _, err := client.GET(memberURL, nil)
+	body, status, finalURL, err := client.GET(memberURL, nil)
 	if err != nil || status != 200 {
 		return "failed", fmt.Sprintf("member page error: %v (status %d)", err, status)
 	}
-	needsLogin := strings.Contains(strings.ToLower(body), `name="amember_login"`) ||
-		strings.Contains(strings.ToLower(body), `id="amember-login"`) ||
-		strings.Contains(strings.ToLower(body), `type="password"`)
+	needsLogin := !httpclient.HasAMemberDashboard(body) && toolbaazarNeedsLogin(body, finalURL)
 
 	if needsLogin {
+		// Fresh login page load — ensures valid PHPSESSID before POST.
+		_, _, _, err := client.GET(loginURL, map[string]string{"Referer": memberURL})
+		if err != nil {
+			return "failed", "toolbaazar login page error: " + err.Error()
+		}
+
 		form := url.Values{}
 		form.Set("amember_login", username)
 		form.Set("amember_pass", password)
 		form.Set("remember_login", "1")
 
-		finalURL, postBody, _, err := client.POST(loginURL, form.Encode(), map[string]string{
+		finalURL, postBody, postStatus, err := client.POST(loginURL, form.Encode(), map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
 			"Origin":       "https://app.toolbaazar.com",
-			"Referer":      memberURL,
+			"Referer":      loginURL,
 		})
-		if err != nil || !httpclient.LoginOK(finalURL, postBody) {
-			return "failed", "toolbaazar login failed"
+		if err != nil {
+			return "failed", "toolbaazar login POST error: " + err.Error()
+		}
+		if !httpclient.LoginOK(finalURL, postBody) {
+			reason := httpclient.LoginFailureReason(finalURL, postBody, postStatus)
+			log.Printf("[Toolbaazar] login failed: %s (url=%s status=%d)", reason, finalURL, postStatus)
+			return "failed", "toolbaazar login failed: " + reason
 		}
 		log.Printf("[Toolbaazar] login OK → %s", finalURL)
 	}
 
-	dashBody, _, _, err := client.GET(memberURL, map[string]string{
+	dashBody, _, dashURL, err := client.GET(memberURL, map[string]string{
 		"Referer": "https://app.toolbaazar.com/",
 	})
 	if err != nil {
 		return "failed", "dashboard load error: " + err.Error()
 	}
-	if strings.Contains(strings.ToLower(dashBody), `name="amember_login"`) {
-		return "failed", "toolbaazar session invalid after login"
+	if strings.Contains(strings.ToLower(dashBody), `name="amember_login"`) ||
+		strings.Contains(strings.ToLower(dashBody), `id="amember-login"`) {
+		reason := httpclient.LoginFailureReason(dashURL, dashBody, 200)
+		if reason == "" {
+			reason = "session invalid after login"
+		}
+		return "failed", "toolbaazar session invalid: " + reason
 	}
 
 	portalCookies, err := collectPortalCookies(client)
@@ -145,6 +159,14 @@ func findSemrushLink(html string) string {
 		return strings.TrimSpace(m[1])
 	}
 	return ""
+}
+
+func toolbaazarNeedsLogin(body, pageURL string) bool {
+	lower := strings.ToLower(body)
+	if strings.Contains(lower, `id="amember-login"`) || strings.Contains(lower, `name="amember_login"`) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(pageURL), "/login")
 }
 
 func collectPortalCookies(client *httpclient.Client) ([]refsPortalCookie, error) {

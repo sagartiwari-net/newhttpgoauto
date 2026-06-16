@@ -56,13 +56,17 @@ func RunSemrush() (string, string) {
 		form.Set("amember_pass", password)
 		form.Set("login_attempt_id", attemptID)
 		form.Set("_referer", "https://noxtools.com/")
-		finalURL, postBody, _, err := client.POST(loginURL, form.Encode(), map[string]string{
+		finalURL, postBody, postStatus, err := client.POST(loginURL, form.Encode(), map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
 			"Origin":       "https://noxtools.com",
 			"Referer":      loginURL,
 		})
-		if err != nil || !noxLoginOK(finalURL, postBody) {
-			return "failed", "noxtools login failed"
+		if err != nil {
+			return "failed", "noxtools login POST error: " + err.Error()
+		}
+		if !noxLoginOK(finalURL, postBody) {
+			reason := httpclient.LoginFailureReason(finalURL, postBody, postStatus)
+			return "failed", "noxtools login failed: " + reason
 		}
 	}
 	if err := savePortalSession(ctx, client, portalSessionID, "https://noxtools.com/"); err != nil {
