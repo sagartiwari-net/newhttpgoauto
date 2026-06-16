@@ -23,7 +23,7 @@ func profileDir() string {
 }
 
 func screenshotDir() string {
-	return filepath.Join(dataRoot(), "screenshots", profileName)
+	return errorScreenshotDir()
 }
 
 func loginCookieFile() string {

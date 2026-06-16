@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -25,14 +24,13 @@ type Session struct {
 
 func newSession(ctx context.Context) (*Session, error) {
 	pDir := profileDir()
-	sDir := screenshotDir()
 	_ = os.MkdirAll(pDir, 0755)
-	_ = os.MkdirAll(sDir, 0755)
+	_ = os.MkdirAll(errorScreenshotDir(), 0755)
 	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
 		_ = os.Remove(filepath.Join(pDir, lf))
 	}
 
-	headless := runtime.GOOS != "darwin" && os.Getenv("DISPLAY") == ""
+	headless := os.Getenv("SEOSHOPE_VISIBLE") != "1"
 	log.Printf("[SEOShope] Launching Chrome (headless=%v, profile=%s)", headless, pDir)
 
 	l := launcher.New().
@@ -40,6 +38,7 @@ func newSession(ctx context.Context) (*Session, error) {
 		Set("no-sandbox").
 		Set("disable-setuid-sandbox").
 		Set("disable-dev-shm-usage").
+		Set("disable-gpu").
 		Set("disable-blink-features", "AutomationControlled").
 		Set("blink-settings", "imagesEnabled=false").
 		Set("disable-remote-fonts").

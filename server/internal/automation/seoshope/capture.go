@@ -45,23 +45,23 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 
 	s.CloseExtraTabs()
 	page := s.EnsurePortalPage()
-	shots := screenshotDir()
 
 	log.Printf("[SEOShope] Navigating to /page/sem for access %s", slot.ButtonNum)
 	if err := page.Timeout(30*time.Second).Navigate(semPageURL); err != nil {
+		saveErrorScreenshot(page, "sem_page_nav_failed")
 		return "failed", "sem page navigation failed: " + err.Error()
 	}
 	time.Sleep(2 * time.Second)
 
 	if isLoginPage(page) {
-		takeScreenshot(page, "sem_page_not_logged_in", shots)
+		saveErrorScreenshot(page, "sem_page_not_logged_in")
 		s.logged = false
 		return "failed", "not logged in on /page/sem — login or Turnstile failed"
 	}
 
 	btn, err := findAccessButton(page, slot)
 	if err != nil {
-		takeScreenshot(page, "no_semrush_btn", shots)
+		saveErrorScreenshot(page, "no_semrush_btn")
 		if isLoginPage(page) {
 			return "failed", "semrush buttons missing: still on login page (session invalid)"
 		}
@@ -80,6 +80,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	btn.MustWaitVisible()
 	if err := btn.Click(proto.InputMouseButtonLeft, 1); err != nil {
 		if !clickAccessButtonJS(page, slot) {
+			saveErrorScreenshot(page, "access_btn_click_failed")
 			return "failed", "access button click failed: " + err.Error()
 		}
 	}
@@ -98,6 +99,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 		currentURL := newPage.MustInfo().URL
 		log.Printf("[SEOShope] redirect %d/20: %s", w+1, currentURL)
 		if strings.Contains(currentURL, "ban.php") {
+			saveErrorScreenshot(newPage, "access_blocked")
 			return "failed", "access blocked by provider"
 		}
 		parsed, _ := url.Parse(currentURL)
@@ -119,7 +121,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 
 	filtered := filterSemrushCookies(raw)
 	if len(filtered) == 0 {
-		takeScreenshot(newPage, "empty_cookies", shots)
+		saveErrorScreenshot(newPage, "empty_cookies")
 		return "failed", "no semrush cookies after redirect"
 	}
 

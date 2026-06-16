@@ -25,7 +25,6 @@ const (
 
 func ensureLoggedIn(ctx context.Context, s *Session, username, password string) error {
 	page := s.EnsurePortalPage()
-	shots := screenshotDir()
 
 	if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
 		var params []*proto.NetworkCookieParam
@@ -37,7 +36,7 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 
 	_ = page.Timeout(30 * time.Second).Navigate(memberURL)
 	time.Sleep(2 * time.Second)
-	waitForPageReady(page, shots, 30*time.Second)
+	waitForPageReady(page, 30*time.Second)
 
 	if isAuthenticated(page) || s.HasMemberCookies() {
 		log.Println("[SEOShope] Already logged in — no login needed")
@@ -62,7 +61,7 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 			s.MarkLoggedIn()
 			return nil
 		}
-		takeScreenshot(page, "unexpected_page_before_login", shots)
+		saveErrorScreenshot(page, "unexpected_page_before_login")
 		return fmt.Errorf("login page not found (url=%s)", pageURL(page))
 	}
 
@@ -70,29 +69,25 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	log.Println("[SEOShope] Reloading login page for Turnstile hijack")
 	_ = page.Reload()
 	time.Sleep(2 * time.Second)
-	waitForPageReady(page, shots, 20*time.Second)
+	waitForPageReady(page, 20*time.Second)
 
 	log.Println("[SEOShope] Performing fresh login...")
 	fillLoginForm(page, username, password)
 	time.Sleep(2 * time.Second)
-	takeScreenshot(page, "after_form_fill", shots)
 	primeTurnstile(page)
 
-	turnstileOK := waitTurnstile(page, shots)
+	turnstileOK := waitTurnstile(page)
 	if !turnstileOK {
 		log.Println("[SEOShope] Turnstile token not received after 30s — submitting anyway (goauto)")
-		takeScreenshot(page, "turnstile_timeout", shots)
-	} else {
-		log.Println("[SEOShope] Turnstile token ready — submitting login")
 	}
-	takeScreenshot(page, "before_submit", shots)
+	log.Println("[SEOShope] Submitting login form")
 	submitLoginForm(page)
 
-	if err := waitForLoginSuccess(page, shots, 45*time.Second); err != nil {
+	if err := waitForLoginSuccess(page, 45*time.Second); err != nil {
 		return err
 	}
 	if !hasMemberSessionCookie(page) {
-		takeScreenshot(page, "login_no_member_cookie", shots)
+		saveErrorScreenshot(page, "login_no_member_cookie")
 		return fmt.Errorf("login failed: no member session cookie (amember_nr) — check credentials")
 	}
 
@@ -104,7 +99,7 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	return nil
 }
 
-func waitForPageReady(page *rod.Page, shots string, timeout time.Duration) bool {
+func waitForPageReady(page *rod.Page, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		info, _ := page.Info()
@@ -128,23 +123,23 @@ func waitForPageReady(page *rod.Page, shots string, timeout time.Duration) bool 
 		}
 		time.Sleep(1 * time.Second)
 	}
-	takeScreenshot(page, "page_ready_timeout", shots)
+	saveErrorScreenshot(page, "page_ready_timeout")
 	return false
 }
 
-func waitForLoginSuccess(page *rod.Page, shots string, timeout time.Duration) error {
+func waitForLoginSuccess(page *rod.Page, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if isAuthenticated(page) && hasMemberSessionCookie(page) {
 			return nil
 		}
 		if msg := loginErrorMessage(page); msg != "" {
-			takeScreenshot(page, "login_rejected", shots)
+			saveErrorScreenshot(page, "login_rejected")
 			return fmt.Errorf("login failed: %s", msg)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	takeScreenshot(page, "login_failed", shots)
+	saveErrorScreenshot(page, "login_failed")
 	return errLoginFailed
 }
 

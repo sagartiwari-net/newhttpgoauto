@@ -1,10 +1,7 @@
 package seoshope
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -111,8 +108,7 @@ func turnstileToken(page *rod.Page) string {
 	return res.Value.Str()
 }
 
-// waitTurnstile — goauto style: wait up to 30s, try click at 10s, submit anyway if needed.
-func waitTurnstile(page *rod.Page, shots string) bool {
+func waitTurnstile(page *rod.Page) bool {
 	for i := 0; i < 60; i++ {
 		if token := turnstileToken(page); token != "" {
 			log.Printf("[SEOShope] Turnstile token ready (len=%d)", len(token))
@@ -121,20 +117,16 @@ func waitTurnstile(page *rod.Page, shots string) bool {
 		if i == 0 || i == 10 || i == 20 || i == 30 {
 			primeTurnstile(page)
 		}
-		if i == 10 {
-			takeScreenshot(page, "turnstile_check_5s", shots)
-		}
 		if i == 20 {
 			log.Println("[SEOShope] Turnstile not auto-solved — trying checkbox click")
-			tryClickTurnstile(page, shots)
+			tryClickTurnstile(page)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	return turnstileToken(page) != ""
 }
 
-func tryClickTurnstile(page *rod.Page, shots string) {
-	takeScreenshot(page, "before_turnstile_click", shots)
+func tryClickTurnstile(page *rod.Page) {
 	container, err := page.Element(".cf-turnstile")
 	if err != nil {
 		return
@@ -194,13 +186,5 @@ func solveCloudflare(page *rod.Page) {
 			}
 			return
 		}
-	}
-}
-
-func takeScreenshot(page *rod.Page, label, dir string) {
-	_ = os.MkdirAll(dir, 0755)
-	fp := filepath.Join(dir, fmt.Sprintf("%s_latest.png", label))
-	if img, err := page.Screenshot(true, nil); err == nil {
-		_ = os.WriteFile(fp, img, 0644)
 	}
 }
