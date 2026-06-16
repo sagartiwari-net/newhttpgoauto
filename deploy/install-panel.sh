@@ -17,6 +17,11 @@ if [ ! -f .env ]; then
   cp ../deploy/.env.panel.example .env
   echo "!! Created server/.env from template — edit passwords before starting"
 fi
+if ! command -v go >/dev/null 2>&1; then
+  echo "==> Go not found — installing Go 1.22..."
+  bash ../deploy/install-go.sh
+  export PATH=$PATH:/usr/local/go/bin
+fi
 go build -o gohttpauto ./cmd
 cd ..
 
