@@ -24,12 +24,15 @@ install_plist() {
 
 install_plist "$SCRIPT_DIR/com.gohttpauto.tunnel.plist" "com.gohttpauto.tunnel.plist"
 install_plist "$SCRIPT_DIR/com.gohttpauto.worker.plist" "com.gohttpauto.worker.plist"
+install_plist "$SCRIPT_DIR/com.gohttpauto.awake.plist" "com.gohttpauto.awake.plist"
 
 # Reload services
 launchctl bootout "gui/$(id -u)/com.gohttpauto.tunnel" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || true
+launchctl bootout "gui/$(id -u)/com.gohttpauto.awake" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.tunnel.plist"
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.worker.plist"
+launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.awake.plist"
 
 echo ""
 echo "============================================"
@@ -38,6 +41,9 @@ echo "============================================"
 echo "Logs:"
 echo "  tail -f $LOG_DIR/worker.log"
 echo "  tail -f $LOG_DIR/tunnel.log"
+echo "  tail -f $LOG_DIR/awake.log"
+echo ""
+echo "Overnight (lid close / no sleep): bash $SCRIPT_DIR/configure-overnight.sh"
 echo ""
 echo "IMPORTANT: Copy SSH key to VPS (one time, needs VPS password):"
 echo "  ssh-copy-id -i $HOME/.ssh/gohttpauto_vps root@74.208.99.161"
