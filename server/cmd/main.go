@@ -8,6 +8,7 @@ import (
 
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
+	"gohttpauto/internal/dbseed"
 	"gohttpauto/internal/handlers"
 	"gohttpauto/internal/middleware"
 	"gohttpauto/internal/queue"
@@ -26,6 +27,7 @@ func main() {
 	defer db.Close()
 
 	handlers.EnsureMasterUser(cfg.MasterUsername, cfg.MasterPassword)
+	dbseed.EnsureTasks()
 	handlers.StartLogCleanupLoop()
 	if cfg.Role == "worker" {
 		queue.StartJobPoller()
