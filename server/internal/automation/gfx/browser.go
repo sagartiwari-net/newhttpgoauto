@@ -30,10 +30,10 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	}
 
 	extPath := extensionDir()
-	// Visible by default on Mac worker for debugging; set GFX_HEADLESS=1 to hide window.
-	headless := os.Getenv("GFX_HEADLESS") == "1"
-	log.Printf("[GFX] Launching Chrome account=%s visible=%v profile=%s ext=%s",
-		slot.Account.WebsiteID, !headless, slot.ProfileDir, extPath)
+	// Headless by default for speed; set GFX_VISIBLE=1 on the worker to show Chrome for debugging.
+	headless := os.Getenv("GFX_VISIBLE") != "1"
+	log.Printf("[GFX] Launching Chrome account=%s headless=%v profile=%s ext=%s",
+		slot.Account.WebsiteID, headless, slot.ProfileDir, extPath)
 
 	l := launcher.New().
 		Headless(headless).
