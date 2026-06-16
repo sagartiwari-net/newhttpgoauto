@@ -136,7 +136,8 @@ CREATE TABLE IF NOT EXISTS `job_queue` (
   INDEX `idx_job_status` (`status`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ─── Seed: first Nox HTTP automation task ────────────────────────────────────
+-- ─── Seed: HTTP automation tasks ───────────────────────────────────────────────
 INSERT INTO `tasks` (`task_uid`, `task_name`, `website_group`, `automation_type`, `interval_minutes`, `is_enabled`) VALUES
-('nox_runSemrush', 'Semrush (NoxTools)', 'nox', 'http', 20, 0)
+('nox_runSemrush', 'Semrush (NoxTools)', 'nox', 'http', 20, 0),
+('azad_runAzadSemrush', 'Semrush (Azad)', 'azad', 'http', 60, 0)
 ON DUPLICATE KEY UPDATE task_name = VALUES(task_name);

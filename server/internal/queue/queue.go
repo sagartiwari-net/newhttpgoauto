@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"gohttpauto/internal/automation/azad"
+	"gohttpauto/internal/automation/nox"
 	"gohttpauto/internal/db"
 )
 
@@ -107,7 +109,9 @@ func RunSync(taskUID, triggeredBy string) bool {
 func Execute(taskUID, automationType string) (status, msg string) {
 	switch taskUID {
 	case "nox_runSemrush":
-		return runNoxSemrushHTTP()
+		return nox.RunSemrush()
+	case "azad_runAzadSemrush":
+		return azad.RunSemrush()
 	default:
 		return "failed", "automation not implemented yet: " + taskUID
 	}
