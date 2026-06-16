@@ -49,6 +49,12 @@ func main() {
 		log.Println("⏰ [SCHEDULER] Disabled — API/dashboard only (set ENABLE_SCHEDULER=true on worker)")
 	}
 
+	// Worker Mac only needs queue poller + scheduler — no HTTP API (avoids :4011 port conflicts).
+	if cfg.Role == "worker" {
+		log.Println("✅ [WORKER] Ready — polling job_queue (no HTTP server on worker)")
+		select {}
+	}
+
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
