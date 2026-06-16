@@ -41,7 +41,7 @@ func main() {
 		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
 	} else {
 		queue.StartQueueMaintenance()
-		log.Printf("🔧 [ROLE] panel — manual runs queued for worker Mac (no local execution)")
+		log.Printf("🔧 [ROLE] panel — runs tasks on server; only GFX queued for Mac worker")
 	}
 	if cfg.EnableScheduler {
 		scheduler.Start()

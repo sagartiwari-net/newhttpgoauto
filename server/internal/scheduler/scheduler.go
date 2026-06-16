@@ -30,7 +30,12 @@ func checkDueTasks() {
 	defer rows.Close()
 	for rows.Next() {
 		var uid string
-		if rows.Scan(&uid) == nil {
+		if rows.Scan(&uid) != nil {
+			continue
+		}
+		if queue.IsMacWorkerTask(uid) {
+			_ = queue.Enqueue(uid, "cron")
+		} else {
 			queue.Submit(uid, "cron")
 		}
 	}

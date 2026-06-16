@@ -148,15 +148,20 @@ func RunTask(c *gin.Context) {
 		triggeredBy = claims.(*auth.Claims).Username
 	}
 	if config.Global.Role == "panel" {
-		if err := queue.Enqueue(req.TaskUID, triggeredBy); err != nil {
+		local, err := queue.Dispatch(req.TaskUID, triggeredBy)
+		if err != nil {
 			if errors.Is(err, queue.ErrTaskBusy) {
 				c.JSON(http.StatusConflict, gin.H{"error": "Task is already running or queued"})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue task: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Task queued for worker Mac", "task_uid": req.TaskUID, "status": "queued"})
+		if local {
+			c.JSON(http.StatusOK, gin.H{"message": "Task started on server", "task_uid": req.TaskUID, "status": "running"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "GFX task queued for Mac worker", "task_uid": req.TaskUID, "status": "queued"})
 		return
 	}
 	if !queue.Submit(req.TaskUID, triggeredBy) {
@@ -290,21 +295,32 @@ type credReq struct {
 	WebsiteID string `json:"website_id" binding:"required"`
 	Label     string `json:"label"`
 	Username  string `json:"username" binding:"required"`
-	Password  string `json:"password" binding:"required"`
+	Password  string `json:"password"` // required for new; leave empty on edit to keep current
 }
 
 func SaveCredential(c *gin.Context) {
 	var req credReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "website_id, username, password required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "website_id and username required"})
 		return
 	}
-	_, err := db.DB.Exec(`
+	var existingPass string
+	err := db.DB.QueryRow(`SELECT password_enc FROM credentials WHERE website_id=?`, req.WebsiteID).Scan(&existingPass)
+	exists := err == nil
+	password := req.Password
+	if password == "" {
+		if !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "password required for new credentials"})
+			return
+		}
+		password = existingPass
+	}
+	_, err = db.DB.Exec(`
 		INSERT INTO credentials (website_id, label, username, password_enc, is_enabled)
 		VALUES (?, ?, ?, ?, 1)
 		ON DUPLICATE KEY UPDATE label=VALUES(label), username=VALUES(username),
 			password_enc=VALUES(password_enc), is_enabled=1, updated_at=NOW()`,
-		req.WebsiteID, req.Label, req.Username, req.Password)
+		req.WebsiteID, req.Label, req.Username, password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

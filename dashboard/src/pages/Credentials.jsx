@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import API from '../api'
-import { Plus, Eye, EyeOff } from 'lucide-react'
+import { Plus, Eye, EyeOff, Pencil } from 'lucide-react'
 
 function PasswordCell({ websiteId, masked }) {
   const [visible, setVisible] = useState(false)
@@ -28,22 +28,47 @@ function PasswordCell({ websiteId, masked }) {
   )
 }
 
+const emptyForm = { website_id: '', label: '', username: '', password: '' }
+
 export default function Credentials() {
   const [creds, setCreds] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ website_id: '', label: '', username: '', password: '' })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
   const [saved, setSaved] = useState(false)
   const role = localStorage.getItem('gha_role')
 
   const load = () => API.get('/credentials').then((r) => setCreds(r.data)).catch(() => {})
   useEffect(() => { load() }, [])
 
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setShowForm(true)
+  }
+
+  const openEdit = (c) => {
+    setEditingId(c.website_id)
+    setForm({
+      website_id: c.website_id,
+      label: c.label || '',
+      username: c.username,
+      password: '',
+    })
+    setShowForm(true)
+  }
+
+  const cancelForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(emptyForm)
+  }
+
   const submit = async (e) => {
     e.preventDefault()
     await API.post('/credentials', form)
     setSaved(true)
-    setForm({ website_id: '', label: '', username: '', password: '' })
-    setShowForm(false)
+    cancelForm()
     load()
     setTimeout(() => setSaved(false), 3000)
   }
@@ -64,9 +89,9 @@ export default function Credentials() {
       {role === 'master' && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-header">
-            <h3>{showForm ? 'Add Credential' : 'Add New'}</h3>
+            <h3>{showForm ? (editingId ? 'Edit Credential' : 'Add Credential') : 'Add New'}</h3>
             {!showForm && (
-              <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+              <button className="btn btn-primary btn-sm" onClick={openAdd}>
                 <Plus size={14} /> Add Credential
               </button>
             )}
@@ -77,8 +102,15 @@ export default function Credentials() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Website ID</label>
-                    <input className="form-input" placeholder="e.g. noxtools" value={form.website_id}
-                      onChange={(e) => setForm({ ...form, website_id: e.target.value })} required />
+                    <input
+                      className="form-input"
+                      placeholder="e.g. noxtools"
+                      value={form.website_id}
+                      onChange={(e) => setForm({ ...form, website_id: e.target.value })}
+                      required
+                      readOnly={!!editingId}
+                      style={editingId ? { opacity: 0.7 } : undefined}
+                    />
                   </div>
                   <div className="form-group">
                     <label>Label (optional)</label>
@@ -93,14 +125,20 @@ export default function Credentials() {
                       onChange={(e) => setForm({ ...form, username: e.target.value })} required />
                   </div>
                   <div className="form-group">
-                    <label>Password</label>
-                    <input className="form-input" type="password" value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+                    <label>Password{editingId ? ' (leave blank to keep current)' : ''}</label>
+                    <input
+                      className="form-input"
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      required={!editingId}
+                      placeholder={editingId ? 'unchanged if empty' : ''}
+                    />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button type="submit" className="btn btn-primary">Save Credential</button>
-                  <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">{editingId ? 'Update' : 'Save'} Credential</button>
+                  <button type="button" className="btn btn-ghost" onClick={cancelForm}>Cancel</button>
                 </div>
               </form>
             </div>
@@ -123,6 +161,7 @@ export default function Credentials() {
                   <th>Password</th>
                   <th>Status</th>
                   <th>Updated</th>
+                  {role === 'master' && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -134,6 +173,13 @@ export default function Credentials() {
                     <td><PasswordCell websiteId={c.website_id} masked={c.password} /></td>
                     <td><span className={`badge ${c.is_enabled ? 'badge-on' : 'badge-off'}`}>{c.is_enabled ? 'Active' : 'Disabled'}</span></td>
                     <td style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(c.updated_at).toLocaleString()}</td>
+                    {role === 'master' && (
+                      <td>
+                        <button className="btn btn-sm" type="button" onClick={() => openEdit(c)} title="Edit credential">
+                          <Pencil size={14} /> Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"time"
 
@@ -37,7 +38,7 @@ func RunSemrush() (string, string) {
 		CookieURL:       "https://noxtools.com/",
 		DomainFilter:    "noxtools.com",
 		PortalSessionID: "noxtools_login",
-		ShowBrowser:     true,
+		ShowBrowser:     runtime.GOOS == "darwin",
 		HeadlessEnv:     "NOX_HEADLESS",
 		KeepOpenEnv:     "NOX_KEEP_OPEN",
 	})

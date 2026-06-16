@@ -151,6 +151,7 @@ func CancelJob(id int) (bool, error) {
 
 // ExpireStaleJobs marks old pending/claimed jobs as failed.
 func ExpireStaleJobs() int {
+	cancelOrphanPending()
 	sec := int(staleQueueAfter.Seconds())
 	res, _ := db.DB.Exec(`
 		UPDATE job_queue SET status='failed', finished_at=NOW()
@@ -172,6 +173,16 @@ func ExpireStaleJobs() int {
 			message=CONCAT(COALESCE(message,''), ' [auto-failed: queue timeout]')
 		WHERE status='running' AND created_at < NOW() - INTERVAL ? SECOND`, sec)
 	return n
+}
+
+// cancelOrphanPending fails pending jobs that are not GFX (panel runs those on the server now).
+func cancelOrphanPending() {
+	res, _ := db.DB.Exec(`
+		UPDATE job_queue SET status='failed', finished_at=NOW()
+		WHERE status='pending' AND task_uid NOT LIKE 'gfx\\_%' ESCAPE '\\'`)
+	if n, _ := res.RowsAffected(); n > 0 {
+		log.Printf("🧹 [QUEUE] Cleared %d non-GFX pending job(s) (run on panel server)", n)
+	}
 }
 
 // StartQueueMaintenance periodically expires stuck queue rows.
@@ -208,7 +219,8 @@ func pollOnce() {
 		var taskUID, triggeredBy string
 		err := db.DB.QueryRow(`
 			SELECT id, task_uid, triggered_by FROM job_queue
-			WHERE status='pending' ORDER BY id ASC LIMIT 1`).Scan(&id, &taskUID, &triggeredBy)
+			WHERE status='pending' AND task_uid LIKE 'gfx\\_%' ESCAPE '\\'
+			ORDER BY id ASC LIMIT 1`).Scan(&id, &taskUID, &triggeredBy)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				log.Printf("⚠️ [WORKER] poll pending jobs failed: %v", err)

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"time"
 
@@ -36,7 +37,7 @@ func RunSemrush() (string, string) {
 		CookieURL:       "https://members.azadseo.com/",
 		DomainFilter:    "azadseo.com",
 		PortalSessionID: "azadseo_login",
-		ShowBrowser:     true,
+		ShowBrowser:     runtime.GOOS == "darwin",
 		HeadlessEnv:     "AZAD_HEADLESS",
 		KeepOpenEnv:     "AZAD_KEEP_OPEN",
 	})
