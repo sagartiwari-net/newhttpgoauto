@@ -186,7 +186,11 @@ func ListQueue(c *gin.Context) {
 	if pending == nil {
 		pending = []queue.JobRow{}
 	}
-	c.JSON(http.StatusOK, gin.H{"running": running, "pending": pending})
+	c.JSON(http.StatusOK, gin.H{
+		"running": running,
+		"pending": pending,
+		"worker":  queue.GetWorkerStatus(),
+	})
 }
 
 func CancelQueueJob(c *gin.Context) {

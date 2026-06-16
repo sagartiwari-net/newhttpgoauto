@@ -22,6 +22,7 @@ type Config struct {
 	LogRetentionDays int
 	EnableScheduler  bool
 	Role             string // "panel" = enqueue only, "worker" = execute jobs
+	WorkerID         string // heartbeat + job claim id (default mac-worker)
 }
 
 var Global *Config
@@ -37,6 +38,7 @@ func Load() *Config {
 		"LOG_RETENTION_DAYS": "2",
 		"ENABLE_SCHEDULER":   "true",
 		"ROLE":               "worker",
+		"WORKER_ID":          "mac-worker",
 	}
 	if f, err := os.Open(".env"); err == nil {
 		defer f.Close()
@@ -85,6 +87,7 @@ func Load() *Config {
 		LogRetentionDays: retention,
 		EnableScheduler:  enableSched,
 		Role:             role,
+		WorkerID:         lookup("WORKER_ID", "mac-worker"),
 	}
 	return Global
 }

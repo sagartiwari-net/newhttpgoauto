@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
@@ -21,8 +22,14 @@ import (
 func main() {
 	cfg := config.Load()
 
-	if err := db.Init(cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPass, cfg.DBName); err != nil {
-		log.Fatalf("❌ Database connection failed: %v", err)
+	var dbErr error
+	if cfg.Role == "worker" {
+		dbErr = db.InitWithRetry(cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPass, cfg.DBName, 90*time.Second)
+	} else {
+		dbErr = db.Init(cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPass, cfg.DBName)
+	}
+	if dbErr != nil {
+		log.Fatalf("❌ Database connection failed: %v", dbErr)
 	}
 	defer db.Close()
 

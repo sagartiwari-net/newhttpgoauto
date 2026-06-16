@@ -6,13 +6,15 @@ import (
 	"log"
 	"time"
 
+	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
 )
 
 const (
-	workerID           = "mac-worker"
 	staleQueueAfter    = 15 * time.Minute
 	queueMaintainEvery = 1 * time.Minute
+	workerHeartbeatKey = "worker:heartbeat"
+	workerAliveWindow  = 45 * time.Second
 )
 
 var ErrTaskBusy = errors.New("task already running or queued")
@@ -27,6 +29,20 @@ type JobRow struct {
 	ClaimedBy   string     `json:"claimed_by,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	ClaimedAt   *time.Time `json:"claimed_at,omitempty"`
+}
+
+func workerID() string {
+	if config.Global != nil && config.Global.WorkerID != "" {
+		return config.Global.WorkerID
+	}
+	return "mac-worker"
+}
+
+// WorkerStatus is returned by the queue API so the panel can show if the Mac worker is online.
+type WorkerStatus struct {
+	WorkerID string     `json:"worker_id"`
+	Alive    bool       `json:"alive"`
+	LastSeen *time.Time `json:"last_seen,omitempty"`
 }
 
 // Enqueue adds a task for the worker if it is not already pending or running.
@@ -93,6 +109,34 @@ func ListActiveJobs() ([]JobRow, error) {
 	return list, nil
 }
 
+// GetWorkerStatus reports whether the Mac worker has polled recently.
+func GetWorkerStatus() WorkerStatus {
+	wid := workerID()
+	st := WorkerStatus{WorkerID: wid}
+	var lockedAt sql.NullTime
+	err := db.DB.QueryRow(`
+		SELECT locked_at FROM system_locks WHERE lock_key=?`, workerHeartbeatKey).Scan(&lockedAt)
+	if err != nil || !lockedAt.Valid {
+		return st
+	}
+	t := lockedAt.Time
+	st.LastSeen = &t
+	st.Alive = time.Since(t) <= workerAliveWindow
+	return st
+}
+
+func touchWorkerHeartbeat() {
+	wid := workerID()
+	_, err := db.DB.Exec(`
+		INSERT INTO system_locks (lock_key, lock_state, locked_by, locked_at, expires_at)
+		VALUES (?, 1, ?, NOW(), NOW() + INTERVAL 2 MINUTE)
+		ON DUPLICATE KEY UPDATE lock_state=1, locked_by=?, locked_at=NOW(), expires_at=NOW() + INTERVAL 2 MINUTE`,
+		workerHeartbeatKey, wid, wid)
+	if err != nil {
+		log.Printf("⚠️ [WORKER] heartbeat update failed: %v", err)
+	}
+}
+
 // CancelJob removes a pending job from the queue (kill).
 func CancelJob(id int) (bool, error) {
 	res, err := db.DB.Exec(`
@@ -146,7 +190,8 @@ func StartQueueMaintenance() {
 func StartJobPoller() {
 	StartQueueMaintenance()
 	go func() {
-		log.Println("👂 [WORKER] Job poller started (3s interval)")
+		log.Printf("👂 [WORKER] Job poller started (3s interval, id=%s)", workerID())
+		pollOnce() // claim immediately — don't wait for first tick
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
@@ -156,6 +201,7 @@ func StartJobPoller() {
 }
 
 func pollOnce() {
+	touchWorkerHeartbeat()
 	ExpireStaleJobs()
 	for {
 		var id int
@@ -164,12 +210,16 @@ func pollOnce() {
 			SELECT id, task_uid, triggered_by FROM job_queue
 			WHERE status='pending' ORDER BY id ASC LIMIT 1`).Scan(&id, &taskUID, &triggeredBy)
 		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				log.Printf("⚠️ [WORKER] poll pending jobs failed: %v", err)
+			}
 			return
 		}
 		res, err := db.DB.Exec(`
 			UPDATE job_queue SET status='claimed', claimed_by=?, claimed_at=NOW()
-			WHERE id=? AND status='pending'`, workerID, id)
+			WHERE id=? AND status='pending'`, workerID(), id)
 		if err != nil {
+			log.Printf("⚠️ [WORKER] claim job #%d failed: %v", id, err)
 			return
 		}
 		n, _ := res.RowsAffected()
@@ -182,8 +232,16 @@ func pollOnce() {
 }
 
 func runClaimedJob(id int, taskUID, triggeredBy string) {
-	if !RunSync(taskUID, triggeredBy) {
-		log.Printf("⚠️ [WORKER] %s already running — job #%d marked failed", taskUID, id)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("❌ [WORKER] panic in job #%d (%s): %v", id, taskUID, r)
+			_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
+		}
+	}()
+
+	ok := RunSync(taskUID, triggeredBy)
+	if !ok {
+		log.Printf("⚠️ [WORKER] %s skipped — job #%d marked failed", taskUID, id)
 		_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
 		return
 	}

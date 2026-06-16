@@ -16,6 +16,7 @@ function waitLabel(createdAt) {
 export default function Queue() {
   const [running, setRunning] = useState([])
   const [pending, setPending] = useState([])
+  const [worker, setWorker] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const load = () => {
@@ -24,6 +25,7 @@ export default function Queue() {
       .then((r) => {
         setRunning(r.data.running || [])
         setPending(r.data.pending || [])
+        setWorker(r.data.worker || null)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -56,6 +58,32 @@ export default function Queue() {
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
+
+      {worker && !worker.alive && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 20,
+            borderColor: '#e74c3c',
+            background: 'rgba(231, 76, 60, 0.08)',
+          }}
+        >
+          <div className="card-body" style={{ color: '#c0392b' }}>
+            <strong>Worker Mac offline</strong> — jobs stay pending until the worker is running
+            and can reach MySQL.
+            {worker.last_seen ? (
+              <div style={{ fontSize: 12, marginTop: 6 }}>
+                Last seen: {fmtTime(worker.last_seen)} ({worker.worker_id})
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, marginTop: 6 }}>
+                No heartbeat yet. On the Mac: SSH tunnel +{' '}
+                <code>./gohttpauto</code> with <code>ROLE=worker</code>.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">

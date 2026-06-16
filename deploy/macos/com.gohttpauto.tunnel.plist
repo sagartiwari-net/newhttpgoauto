@@ -8,7 +8,7 @@
   <array>
     <string>/usr/bin/ssh</string>
     <string>-i</string>
-    <string>__HOME__/.ssh/vps_tunnel</string>
+    <string>__HOME__/.ssh/gohttpauto_vps</string>
     <string>-N</string>
     <string>-o</string>
     <string>ServerAliveInterval=30</string>

@@ -2,7 +2,7 @@
 # Install always-on tunnel + worker on Aman's Mac (run via SSH as amantiwari)
 set -e
 
-APP_DIR="${1:-$HOME/Desktop/newhttpgoauto}"
+APP_DIR="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 HOME_DIR="$HOME"
 PLIST_DIR="$HOME_DIR/Library/LaunchAgents"
 LOG_DIR="$HOME_DIR/Library/Logs/gohttpauto"
@@ -39,6 +39,6 @@ echo "Logs:"
 echo "  tail -f $LOG_DIR/worker.log"
 echo "  tail -f $LOG_DIR/tunnel.log"
 echo ""
-echo "IMPORTANT: SSH key to VPS required for tunnel (no password prompt):"
-echo "  ssh-copy-id root@74.208.99.161"
+echo "IMPORTANT: Copy SSH key to VPS (one time, needs VPS password):"
+echo "  ssh-copy-id -i $HOME/.ssh/gohttpauto_vps root@74.208.99.161"
 echo "============================================"

@@ -54,9 +54,23 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	time.Sleep(2 * time.Second)
 
 	if isLoginPage(page) {
+		log.Println("[SEOShope] /page/sem shows login — clearing stale session and re-logging in")
 		saveErrorScreenshot(page, "sem_page_not_logged_in")
 		s.logged = false
-		return "failed", "not logged in on /page/sem — login or Turnstile failed"
+		clearPortalSession(page)
+		if err := ensureLoggedIn(ctx, s, username, password); err != nil {
+			return "failed", "login retry after /page/sem redirect: " + err.Error()
+		}
+		page = s.EnsurePortalPage()
+		if err := page.Timeout(30 * time.Second).Navigate(semPageURL); err != nil {
+			saveErrorScreenshot(page, "sem_page_nav_retry_failed")
+			return "failed", "sem page navigation failed after login: " + err.Error()
+		}
+		time.Sleep(2 * time.Second)
+		if isLoginPage(page) {
+			saveErrorScreenshot(page, "sem_page_still_login")
+			return "failed", "still not logged in on /page/sem after fresh login"
+		}
 	}
 
 	btn, err := findAccessButton(page, slot)

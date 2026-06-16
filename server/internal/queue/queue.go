@@ -88,7 +88,7 @@ func RunSync(taskUID, triggeredBy string) bool {
 		Scan(&t.TaskUID, &t.TaskName, &t.WebsiteGroup, &t.AutomationType, &t.IntervalMinutes, &t.IsEnabled)
 	if err != nil {
 		log.Printf("⚠️ [QUEUE] task %s not found", taskUID)
-		return true
+		return false
 	}
 
 	res, _ := db.DB.Exec(

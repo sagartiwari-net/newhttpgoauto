@@ -29,6 +29,26 @@ func Init(host, port, user, pass, name string) error {
 	return nil
 }
 
+// InitWithRetry waits for MySQL (e.g. SSH tunnel still starting on worker boot).
+func InitWithRetry(host, port, user, pass, name string, maxWait time.Duration) error {
+	deadline := time.Now().Add(maxWait)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		if err := Init(host, port, user, pass, name); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			if DB != nil {
+				_ = DB.Close()
+				DB = nil
+			}
+			log.Printf("⏳ [DB] waiting for MySQL (%s:%s)... %v", host, port, err)
+			time.Sleep(3 * time.Second)
+		}
+	}
+	return lastErr
+}
+
 func Close() {
 	if DB != nil {
 		_ = DB.Close()
