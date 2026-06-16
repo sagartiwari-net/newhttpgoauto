@@ -92,6 +92,9 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 	}
 
 	log.Printf("[gfx_%s] Filling credentials...", slot.Account.WebsiteID)
+	stopWatch, loginAPI := watchGFXLoginAPI(page)
+	defer stopWatch()
+
 	_, err := page.Eval(`(u, p) => {
 		const loginEl = document.querySelector('input[type="email"]');
 		const passEl  = document.querySelector('input[type="password"]');
@@ -149,11 +152,17 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
+		if !isRedirected {
+			saveErrorScreenshot(page, accountID, "device_limit")
+			return fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, "device limit — Sign In Again did not work"))
+		}
 	}
 
 	if !isRedirected {
+		time.Sleep(2 * time.Second) // allow auth/login response body
+		pageErr := readPageLoginError(page)
 		saveErrorScreenshot(page, accountID, "signin_failed")
-		return fmt.Errorf("GFX sign-in failed (still on signin page)")
+		return fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, pageErr))
 	}
 	log.Printf("[gfx_%s] Login successful", slot.Account.WebsiteID)
 	return nil
