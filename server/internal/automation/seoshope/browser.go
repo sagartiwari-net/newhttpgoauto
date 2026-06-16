@@ -58,7 +58,7 @@ func newSession(ctx context.Context) (*Session, error) {
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 	})
-	attachTurnstileHijack(page)
+	attachTurnstileIfNeeded(page)
 
 	return &Session{browser: browser, page: page, cancel: cancel}, nil
 }

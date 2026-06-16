@@ -48,14 +48,23 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	s.CloseExtraTabs()
 
 	log.Printf("[SEOShope] Navigating to /page/sem for access %s", slot.ButtonNum)
-	if err := page.Timeout(30*time.Second).Navigate("https://app.seoshope.com/page/sem"); err != nil {
+	if err := page.Timeout(30*time.Second).Navigate(semPageURL); err != nil {
 		return "failed", "sem page navigation failed: " + err.Error()
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
+
+	if isLoginPage(page) || !hasMemberSessionCookie(page) {
+		takeScreenshot(page, "sem_page_not_logged_in", shots)
+		s.logged = false
+		return "failed", "not logged in on /page/sem — login or Turnstile failed"
+	}
 
 	btn, err := findAccessButton(page, slot)
 	if err != nil {
 		takeScreenshot(page, "no_semrush_btn", shots)
+		if isLoginPage(page) {
+			return "failed", "semrush buttons missing: still on login page (session invalid)"
+		}
 		return "failed", err.Error()
 	}
 

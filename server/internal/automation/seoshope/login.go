@@ -19,12 +19,16 @@ import (
 
 const (
 	memberURL        = "https://app.seoshope.com/member"
+	semPageURL       = "https://app.seoshope.com/page/sem"
 	portalSessionKey = "seoshope_login"
 )
 
 func ensureLoggedIn(ctx context.Context, s *Session, username, password string) error {
 	if s.LoggedIn() {
-		return nil
+		if isDashboard(s.Page()) {
+			return nil
+		}
+		s.logged = false
 	}
 
 	page := s.Page()
@@ -39,62 +43,42 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	}
 
 	_ = page.Timeout(30 * time.Second).Navigate(memberURL)
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
-	for i := 0; i < 30; i++ {
-		info, _ := page.Info()
-		title, currentURL := "", ""
-		if info != nil {
-			title = info.Title
-			currentURL = info.URL
-		}
-
-		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
-			solveCloudflare(page)
-			time.Sleep(3 * time.Second)
-			continue
-		}
-
-		if strings.Contains(strings.ToLower(title), "error has occurred") {
-			_ = os.Remove(loginCookieFile())
-			_ = proto.NetworkClearBrowserCookies{}.Call(page)
-			_ = page.Navigate(memberURL)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		hasLogin, _, _ := page.Has("input[name='amember_login']")
-		hasPass, _, _ := page.Has("input[type='password']")
-		if !hasLogin && !hasPass && strings.Contains(currentURL, "member") && !strings.Contains(currentURL, "login") {
-			log.Println("[SEOShope] Already logged in via profile/session")
+	if waitForPageReady(page, shots, 30*time.Second) && isDashboard(page) {
+		log.Println("[SEOShope] Already logged in via profile/session")
+		if hasMemberSessionCookie(page) {
 			s.MarkLoggedIn()
 			_ = savePortalCookies(ctx, page)
 			return nil
 		}
-		if hasPass {
-			break
-		}
-		time.Sleep(1 * time.Second)
+		log.Println("[SEOShope] Stale session (only PHPSESSID) — clearing and re-login")
+		clearPortalSession(page)
+	}
+
+	if !isLoginPage(page) {
+		takeScreenshot(page, "unexpected_page_before_login", shots)
+		return fmt.Errorf("login page not found (url=%s)", pageURL(page))
 	}
 
 	log.Println("[SEOShope] Performing fresh login...")
 	fillLoginForm(page, username, password)
 	time.Sleep(2 * time.Second)
-	waitTurnstile(page, shots)
+	takeScreenshot(page, "after_form_fill", shots)
+
+	if !waitTurnstile(page, shots) {
+		takeScreenshot(page, "turnstile_timeout", shots)
+		return fmt.Errorf("login failed: Cloudflare Turnstile not solved (wait up to 30s on Mac)")
+	}
+	log.Println("[SEOShope] Turnstile token ready — submitting login")
 	submitLoginForm(page)
 
-	for i := 0; i < 24; i++ {
-		hasPass, _, _ := page.Has("input[type='password']")
-		if !hasPass {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
+	if err := waitForLoginSuccess(page, shots, 45*time.Second); err != nil {
+		return err
 	}
-
-	hasPass, _, _ := page.Has("input[type='password']")
-	if hasPass {
-		takeScreenshot(page, "login_failed", shots)
-		return errLoginFailed
+	if !hasMemberSessionCookie(page) {
+		takeScreenshot(page, "login_no_member_cookie", shots)
+		return fmt.Errorf("login failed: no member session cookie (amember_nr) — check credentials")
 	}
 
 	log.Println("[SEOShope] Login successful")
@@ -105,13 +89,136 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	return nil
 }
 
+func waitForPageReady(page *rod.Page, shots string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		info, _ := page.Info()
+		title := ""
+		if info != nil {
+			title = info.Title
+		}
+		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
+			solveCloudflare(page)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		if strings.Contains(strings.ToLower(title), "error has occurred") {
+			clearPortalSession(page)
+			_ = page.Navigate(memberURL)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if isDashboard(page) || isLoginPage(page) {
+			return true
+		}
+		time.Sleep(1 * time.Second)
+	}
+	takeScreenshot(page, "page_ready_timeout", shots)
+	return false
+}
+
+func waitForLoginSuccess(page *rod.Page, shots string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if isDashboard(page) && hasMemberSessionCookie(page) {
+			return nil
+		}
+		if msg := loginErrorMessage(page); msg != "" {
+			takeScreenshot(page, "login_rejected", shots)
+			return fmt.Errorf("login failed: %s", msg)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	takeScreenshot(page, "login_failed", shots)
+	return errLoginFailed
+}
+
+func isDashboard(page *rod.Page) bool {
+	selectors := []string{
+		"a[href*='logout']",
+		".am-user-info",
+		".am-member-layout",
+		".am-layout-content",
+		"button.semmy-btn",
+	}
+	for _, sel := range selectors {
+		if has, _, _ := page.Has(sel); has {
+			return true
+		}
+	}
+	return hasMemberSessionCookie(page)
+}
+
+func isLoginPage(page *rod.Page) bool {
+	if has, _, _ := page.Has("input[name='amember_login']"); has {
+		return true
+	}
+	if has, _, _ := page.Has("input[name='amember_pass']"); has {
+		return true
+	}
+	if has, _, _ := page.Has("#login-submit-button, .frm-submit"); has {
+		return true
+	}
+	return false
+}
+
+func hasMemberSessionCookie(page *rod.Page) bool {
+	cookies, err := page.Cookies([]string{"https://app.seoshope.com"})
+	if err != nil {
+		return false
+	}
+	for _, c := range cookies {
+		name := strings.ToLower(c.Name)
+		if name == "amember_nr" || name == "amember_ru" || strings.HasPrefix(name, "amember_auth") {
+			return true
+		}
+	}
+	return false
+}
+
+func loginErrorMessage(page *rod.Page) string {
+	res, err := page.Eval(`() => {
+		const sel = ['.am-error', '.am-form-error', '.error', '.alert-danger', '.am-alert'];
+		for (const s of sel) {
+			const el = document.querySelector(s);
+			if (el && el.textContent.trim()) return el.textContent.trim();
+		}
+		return "";
+	}`)
+	if err != nil || res.Value.Str() == "" {
+		return ""
+	}
+	if isLoginPage(page) {
+		return res.Value.Str()
+	}
+	return ""
+}
+
+func clearPortalSession(page *rod.Page) {
+	_ = os.Remove(loginCookieFile())
+	_ = proto.NetworkClearBrowserCookies{}.Call(page)
+}
+
+func pageURL(page *rod.Page) string {
+	info, err := page.Info()
+	if err != nil || info == nil {
+		return ""
+	}
+	return info.URL
+}
+
 var errLoginFailed = &loginError{}
 
 type loginError struct{}
 
-func (e *loginError) Error() string { return "login failed: still on login page (Turnstile or credentials)" }
+func (e *loginError) Error() string {
+	return "login failed: still on login page after submit (Turnstile or credentials)"
+}
 
 func savePortalCookies(ctx context.Context, page *rod.Page) error {
+	if !hasMemberSessionCookie(page) {
+		return fmt.Errorf("refusing to save portal cookies without member session")
+	}
 	cookies, err := page.Cookies([]string{})
 	if err != nil {
 		return err
@@ -180,6 +287,9 @@ func runPortalHome(ctx context.Context, s *Session) (string, string) {
 			Secure:   c.Secure,
 			SameSite: &ss,
 		})
+	}
+	if !hasMemberSessionCookie(s.Page()) {
+		return "failed", "portal login incomplete — missing amember_nr session cookie"
 	}
 	if len(stored) == 0 {
 		return "failed", "no portal cookies captured"

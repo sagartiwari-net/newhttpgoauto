@@ -5,12 +5,27 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 )
+
+// useTurnstileHijack enables mock Turnstile only on headless Linux.
+// On Mac the server rejects the mock token — real browser Turnstile is required.
+func useTurnstileHijack() bool {
+	return runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
+}
+
+func attachTurnstileIfNeeded(page *rod.Page) {
+	if !useTurnstileHijack() {
+		log.Println("[SEOShope] Real Turnstile mode — no API hijack (Mac/visible Chrome)")
+		return
+	}
+	attachTurnstileHijack(page)
+}
 
 func attachTurnstileHijack(page *rod.Page) {
 	router := page.HijackRequests()
@@ -96,20 +111,38 @@ func submitLoginForm(page *rod.Page) {
 }
 
 func waitTurnstile(page *rod.Page, shots string) bool {
+	realMode := !useTurnstileHijack()
 	for i := 0; i < 60; i++ {
-		res, err := page.Eval(`() => {
-			const inp = document.querySelector('input[name="cf-turnstile-response"]');
-			return inp ? inp.value : "";
-		}`)
-		if err == nil && res.Value.Str() != "" {
+		if hasValidTurnstileToken(page, realMode) {
 			return true
 		}
-		if i == 20 {
+		if i == 10 || i == 30 {
 			tryClickTurnstile(page, shots)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	return false
+}
+
+func hasValidTurnstileToken(page *rod.Page, realMode bool) bool {
+	res, err := page.Eval(`() => {
+		const inp = document.querySelector('input[name="cf-turnstile-response"]');
+		return inp ? inp.value : "";
+	}`)
+	if err != nil {
+		return false
+	}
+	token := res.Value.Str()
+	if token == "" {
+		return false
+	}
+	if strings.Contains(token, "mock_turnstile") {
+		return false
+	}
+	if realMode {
+		return len(token) > 80
+	}
+	return true
 }
 
 func tryClickTurnstile(page *rod.Page, shots string) {
