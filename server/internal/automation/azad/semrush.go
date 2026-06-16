@@ -6,21 +6,17 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
-	"gohttpauto/internal/automation/httpclient"
 	"gohttpauto/internal/automation/portalchrome"
 	"gohttpauto/internal/cookiesession"
 	"gohttpauto/internal/db"
 )
 
-var semrushLinkRE = regexp.MustCompile(`(?i)href=["']([^"']*(?:semrush2\.(?:azadseo\.com|xemrush\.click)|xemrush\.click)[^"']*)["']`)
-
-// RunSemrush logs into Azad via Chrome (Cloudflare-safe) and captures Semrush cookies over HTTP.
+// RunSemrush logs into Azad and captures Semrush proxy cookies — all in visible Chrome.
 func RunSemrush() (string, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	var username, password string
@@ -31,119 +27,120 @@ func RunSemrush() (string, string) {
 		return "failed", "azadseo credentials not found in database"
 	}
 
-	client := httpclient.New(60 * time.Second)
 	memberURL := "https://members.azadseo.com/member"
-	portalSessionID := "azadseo_login"
-
-	if err := portalchrome.EnsureSession(ctx, client, username, password, portalchrome.SessionConfig{
+	sess, err := portalchrome.OpenLoggedIn(ctx, username, password, portalchrome.SessionConfig{
 		Tag:             "[Azad]",
 		Profile:         "azadseo",
 		MemberURL:       memberURL,
+		LoginURL:        "https://members.azadseo.com/login",
 		CookieURL:       "https://members.azadseo.com/",
 		DomainFilter:    "azadseo.com",
-		PortalSessionID: portalSessionID,
-		VisibleEnv:      "AZAD_VISIBLE",
-	}); err != nil {
+		PortalSessionID: "azadseo_login",
+		ShowBrowser:     true,
+		HeadlessEnv:     "AZAD_HEADLESS",
+		KeepOpenEnv:     "AZAD_KEEP_OPEN",
+	})
+	if err != nil {
 		return "failed", "azadseo portal login failed: " + err.Error()
 	}
+	defer sess.Close()
 
-	dashBody, _, _, err := client.GET(memberURL, map[string]string{
-		"Referer": "https://members.azadseo.com/",
-	})
-	if err != nil {
-		return "failed", "dashboard load error: " + err.Error()
-	}
-	if httpclient.IsCloudflareChallenge(dashBody) {
-		return "failed", "dashboard blocked by Cloudflare after login"
-	}
+	page := sess.Page
+	browser := sess.Browser
 
-	btn := findSemrushLink(dashBody)
-	if btn == "" {
+	log.Println("[Azad] locating semrush access link on dashboard...")
+	var btnHref string
+	for i := 0; i < 15; i++ {
+		has, el, err := page.Has(`a[href*="semrush2"], a[href*="xemrush.click"]`)
+		if err == nil && has && el != nil {
+			if href, err := el.Attribute("href"); err == nil && href != nil {
+				btnHref = *href
+				break
+			}
+		}
+		elements, _ := page.Elements("a")
+		for _, el := range elements {
+			href, err := el.Attribute("href")
+			if err != nil || href == nil {
+				continue
+			}
+			h := strings.ToLower(*href)
+			if strings.Contains(h, "semrush2") || strings.Contains(h, "xemrush.click") {
+				btnHref = *href
+				break
+			}
+		}
+		if btnHref != "" {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if btnHref == "" {
 		return "failed", "semrush access link not found on dashboard"
 	}
-	if strings.HasPrefix(btn, "/") {
-		btn = "https://members.azadseo.com" + btn
+	if strings.HasPrefix(btnHref, "/") {
+		btnHref = "https://members.azadseo.com" + btnHref
 	}
-	log.Printf("[Azad] semrush link: %s", btn)
+	log.Printf("[Azad] semrush link: %s", btnHref)
 
-	finalSemURL, _, _, err := client.GET(btn, map[string]string{
-		"Referer": memberURL,
-	})
+	newPage := browser.MustPage("")
+	if err := newPage.Timeout(60*time.Second).Navigate(btnHref); err != nil {
+		return "failed", "semrush access navigation failed: " + err.Error()
+	}
+
+	hasProxy := false
+	for w := 0; w < 30; w++ {
+		raw, err := newPage.Cookies([]string{})
+		if err == nil {
+			for _, c := range raw {
+				n := strings.ToLower(c.Name)
+				if n == "cf_clearance" || n == "proxy_token" || n == "is_unique" || strings.HasPrefix(n, "_cf") {
+					hasProxy = true
+					break
+				}
+			}
+		}
+		if hasProxy {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	time.Sleep(5 * time.Second)
+
+	raw, err := newPage.Cookies([]string{})
 	if err != nil {
-		return "failed", "semrush access error: " + err.Error()
-	}
-	if !strings.Contains(strings.ToLower(finalSemURL), "xemrush.click") {
-		log.Printf("⚠️ [Azad] final URL: %s", finalSemURL)
+		return "failed", "cookie read failed: " + err.Error()
 	}
 
-	cookies := filterSemrushCookies(client.HTTP.Jar, client.Captured)
-	if len(cookies) == 0 {
-		return "failed", "no valid semrush proxy cookies captured"
+	var stored []cookiesession.Cookie
+	expires := time.Now().Add(365 * 24 * time.Hour)
+	for _, c := range raw {
+		if strings.Contains(strings.ToLower(c.Name), "amember") {
+			continue
+		}
+		if c.Name == "" {
+			continue
+		}
+		stored = append(stored, cookiesession.SimpleCookie(
+			".xemrush.click", c.Name, c.Value, c.Secure, c.HTTPOnly, expires,
+		))
+	}
+	if len(stored) == 0 {
+		return "failed", "no semrush proxy cookies captured in browser"
 	}
 
-	netscape := cookiesession.BuildNetscape(cookies, "Generated by GoHttpAuto Azad HTTP Engine")
-	err = cookiesession.Save(ctx, cookiesession.SaveOptions{
+	netscape := cookiesession.BuildNetscape(stored, "Generated by GoHttpAuto Azad Chrome")
+	if err := cookiesession.Save(ctx, cookiesession.SaveOptions{
 		WebsiteID: "azad",
 		Referer:   "https://semrush2.xemrush.click/",
-		Cookies:   cookies,
+		Cookies:   stored,
 		Netscape:  netscape,
-	})
-	if err != nil {
+	}); err != nil {
 		return "failed", "db save error: " + err.Error()
 	}
 
 	go uploadCookies(netscape)
-	return "success", fmt.Sprintf("Chrome login + HTTP capture — %d cookies updated", len(cookies))
-}
-
-func findSemrushLink(html string) string {
-	if m := semrushLinkRE.FindStringSubmatch(html); len(m) > 1 {
-		return strings.TrimSpace(m[1])
-	}
-	return ""
-}
-
-func filterSemrushCookies(jar http.CookieJar, captured []*http.Cookie) []cookiesession.Cookie {
-	seen := map[string]bool{}
-	var out []cookiesession.Cookie
-	expires := time.Now().Add(365 * 24 * time.Hour)
-
-	add := func(c *http.Cookie) {
-		if c == nil || c.Name == "" {
-			return
-		}
-		if strings.Contains(strings.ToLower(c.Name), "amember") {
-			return
-		}
-		key := c.Name + "|" + c.Value
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-
-		exp := expires
-		if !c.Expires.IsZero() {
-			exp = c.Expires
-		}
-		out = append(out, cookiesession.SimpleCookie(
-			".xemrush.click", c.Name, c.Value, c.Secure, c.HttpOnly, exp,
-		))
-	}
-
-	for _, c := range captured {
-		add(c)
-	}
-	for _, host := range []string{
-		"https://semrush2.xemrush.click/",
-		"https://xemrush.click/",
-	} {
-		u, _ := url.Parse(host)
-		for _, c := range jar.Cookies(u) {
-			cp := *c
-			add(&cp)
-		}
-	}
-	return out
+	return "success", fmt.Sprintf("Chrome automation — %d cookies captured", len(stored))
 }
 
 const azadUploadURL = "https://refs.1clkaccess.store/azsm2.php"
@@ -161,7 +158,5 @@ func uploadCookies(netscape string) {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		log.Printf("✅ [Azad] cookies synced to %s", azadUploadURL)
-	} else {
-		log.Printf("⚠️ [Azad] %s returned HTTP %d", azadUploadURL, resp.StatusCode)
 	}
 }

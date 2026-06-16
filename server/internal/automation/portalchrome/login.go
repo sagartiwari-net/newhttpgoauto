@@ -2,11 +2,9 @@ package portalchrome
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,9 +12,6 @@ import (
 	"gohttpauto/internal/cookiesession"
 
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/go-rod/stealth"
 )
 
 // SessionConfig controls Chrome portal login + HTTP cookie handoff.
@@ -28,7 +23,10 @@ type SessionConfig struct {
 	CookieURL       string // base URL for jar, e.g. https://noxtools.com/
 	DomainFilter    string // e.g. noxtools.com
 	PortalSessionID string // shared_sessions key
-	VisibleEnv      string // e.g. NOX_VISIBLE=1 → set env var name only: NOX_VISIBLE
+	ShowBrowser     bool   // true = visible Chrome window on worker Mac
+	HeadlessEnv     string // force headless when env=1, e.g. NOX_HEADLESS
+	KeepOpenEnv     string // keep browser open after task when env=1, e.g. NOX_KEEP_OPEN
+	VisibleEnv      string // deprecated alias — if set and =1, ShowBrowser=true
 }
 
 // EnsureSession restores HTTP cookies when valid; otherwise logs in via Chrome.
@@ -50,7 +48,7 @@ func EnsureSession(ctx context.Context, client *httpclient.Client, username, pas
 		log.Printf("%s login required — using Chrome login", cfg.Tag)
 	}
 
-	cookies, err := chromeLogin(ctx, username, password, cfg)
+	cookies, err := loginAndExportCookies(ctx, username, password, cfg)
 	if err != nil {
 		return err
 	}
@@ -94,140 +92,26 @@ func EnsureSession(ctx context.Context, client *httpclient.Client, username, pas
 	return nil
 }
 
-func chromeLogin(ctx context.Context, username, password string, cfg SessionConfig) ([]cookiesession.Cookie, error) {
-	pDir := profileDir(cfg.Profile)
-	_ = os.MkdirAll(pDir, 0755)
-	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
-		_ = os.Remove(filepath.Join(pDir, lf))
-	}
-
-	headless := true
-	if cfg.VisibleEnv != "" && os.Getenv(cfg.VisibleEnv) == "1" {
-		headless = false
-	}
-	log.Printf("%s launching Chrome (headless=%v, profile=%s)", cfg.Tag, headless, pDir)
-
-	l := launcher.New().
-		Headless(headless).
-		Set("no-sandbox").
-		Set("disable-setuid-sandbox").
-		Set("disable-dev-shm-usage").
-		Set("disable-gpu").
-		Set("disable-blink-features", "AutomationControlled").
-		Set("mute-audio").
-		Set("disable-popup-blocking").
-		Set("window-size", "1366,768").
-		UserDataDir(pDir)
-
-	u, err := l.Launch()
-	if err != nil {
-		return nil, fmt.Errorf("chrome launch: %w", err)
-	}
-
-	browser := rod.New().ControlURL(u).MustConnect().Context(ctx)
-	defer browser.MustClose()
-
-	page := stealth.MustPage(browser)
-	page.MustSetViewport(1366, 768, 1, false)
-	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-	})
-
-	cookieFile := loginCookieFile(cfg.Profile)
-	if cBytes, err := os.ReadFile(cookieFile); err == nil {
-		var params []*proto.NetworkCookieParam
-		if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {
-			_ = page.SetCookies(params)
-			log.Printf("%s restored %d Chrome profile cookies", cfg.Tag, len(params))
-		}
-	}
-
-	if err := page.Timeout(30 * time.Second).Navigate(cfg.MemberURL); err != nil {
-		log.Printf("%s navigation warning: %v", cfg.Tag, err)
-	}
-	time.Sleep(2 * time.Second)
-
-	if waitCloudflare(page, cfg.Tag) {
-		time.Sleep(2 * time.Second)
-	}
-
-	loggedIn, needForm := pollLoginState(page, 30*time.Second)
-	if !loggedIn && !needForm && cfg.LoginURL != "" {
-		log.Printf("%s opening login page %s", cfg.Tag, cfg.LoginURL)
-		_ = page.Timeout(30 * time.Second).Navigate(cfg.LoginURL)
-		time.Sleep(2 * time.Second)
-		loggedIn, needForm = pollLoginState(page, 20*time.Second)
-	}
-	if loggedIn {
-		log.Printf("%s already logged in via Chrome profile", cfg.Tag)
-		return exportCookies(page, cfg)
-	}
-	if !needForm {
-		return nil, fmt.Errorf("login form not found on portal")
-	}
-
-	log.Printf("%s filling login form", cfg.Tag)
-	res, err := page.Eval(`(u, p) => {
-		const loginEl = document.querySelector('input[name="amember_login"]')
-			|| document.querySelector('#amember-login')
-			|| document.querySelector('input[type="email"]');
-		const passEl = document.querySelector('input[name="amember_pass"]')
-			|| document.querySelector('#amember-pass')
-			|| document.querySelector('input[type="password"]');
-		if (!loginEl || !passEl) return false;
-		loginEl.value = u;
-		passEl.value = p;
-		['input', 'change'].forEach(ev => {
-			loginEl.dispatchEvent(new Event(ev, { bubbles: true }));
-			passEl.dispatchEvent(new Event(ev, { bubbles: true }));
-		});
-		const rememberEl = document.querySelector('input[name="remember_login"]') || document.querySelector('input[type="checkbox"]');
-		if (rememberEl) {
-			rememberEl.checked = true;
-			rememberEl.dispatchEvent(new Event('change', { bubbles: true }));
-		}
-		return true;
-	}`, username, password)
-	if err != nil || res == nil || !res.Value.Bool() {
-		return nil, fmt.Errorf("could not fill login form")
-	}
-
-	time.Sleep(1 * time.Second)
-	_, _ = page.Eval(`() => {
-		const btn = document.querySelector('#loginBtn')
-			|| document.querySelector('#login-submit-button')
-			|| document.querySelector('#submit')
-			|| document.querySelector('button[type="submit"]')
-			|| document.querySelector('input[type="submit"]');
-		if (btn) { btn.click(); return true; }
-		const loginInput = document.querySelector('input[name="amember_login"]');
-		if (loginInput && loginInput.form) { loginInput.form.submit(); return true; }
-		return false;
-	}`)
-
-	deadline := time.Now().Add(45 * time.Second)
-	for time.Now().Before(deadline) {
-		if logged, _ := pollLoginState(page, 2*time.Second); logged {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	if logged, _ := pollLoginState(page, 2*time.Second); !logged {
-		return nil, fmt.Errorf("login failed — still on login page")
-	}
-
-	cookies, err := exportCookies(page, cfg)
+func loginAndExportCookies(ctx context.Context, username, password string, cfg SessionConfig) ([]cookiesession.Cookie, error) {
+	cfg = normalizeCfg(cfg)
+	browser, page, cancel, err := launchBrowser(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	if raw, err := page.Cookies([]string{}); err == nil {
-		if b, err := json.Marshal(proto.CookiesToParams(raw)); err == nil {
-			_ = os.MkdirAll(filepath.Dir(cookieFile), 0755)
-			_ = os.WriteFile(cookieFile, b, 0644)
-		}
+	defer browser.MustClose()
+	defer cancel()
+
+	if err := loginOnPage(page, username, password, cfg); err != nil {
+		return nil, err
 	}
-	return cookies, nil
+	return exportCookies(page, cfg)
+}
+
+func normalizeCfg(cfg SessionConfig) SessionConfig {
+	if cfg.VisibleEnv != "" && os.Getenv(cfg.VisibleEnv) == "1" {
+		cfg.ShowBrowser = true
+	}
+	return cfg
 }
 
 func applyPortalCookies(client *httpclient.Client, cfg SessionConfig, cookies []cookiesession.Cookie) {
