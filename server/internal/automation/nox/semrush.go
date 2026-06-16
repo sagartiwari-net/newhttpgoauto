@@ -37,6 +37,7 @@ func RunSemrush() (string, string) {
 		Tag:             "[Nox]",
 		Profile:         "noxtools",
 		MemberURL:       "https://noxtools.com/secure/member",
+		LoginURL:        "https://noxtools.com/secure/login",
 		CookieURL:       "https://noxtools.com/",
 		DomainFilter:    "noxtools.com",
 		PortalSessionID: portalSessionID,

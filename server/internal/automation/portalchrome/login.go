@@ -24,6 +24,7 @@ type SessionConfig struct {
 	Tag             string // e.g. "[Nox]"
 	Profile         string // profile folder name
 	MemberURL       string
+	LoginURL        string // optional — open if member page has no form/dashboard
 	CookieURL       string // base URL for jar, e.g. https://noxtools.com/
 	DomainFilter    string // e.g. noxtools.com
 	PortalSessionID string // shared_sessions key
@@ -56,8 +57,11 @@ func EnsureSession(ctx context.Context, client *httpclient.Client, username, pas
 	if len(cookies) == 0 {
 		return fmt.Errorf("no portal cookies after Chrome login")
 	}
+	if !hasMemberSessionCookies(cookies) {
+		return fmt.Errorf("Chrome login did not produce member session cookies (check credentials)")
+	}
 
-	_ = client.SetCookies(cfg.CookieURL, cookiesession.ToHTTPCookies(cookies))
+	applyPortalCookies(client, cfg, cookies)
 	if err := cookiesession.Save(ctx, cookiesession.SaveOptions{
 		WebsiteID: cfg.PortalSessionID,
 		Referer:   cfg.MemberURL,
@@ -66,12 +70,25 @@ func EnsureSession(ctx context.Context, client *httpclient.Client, username, pas
 		log.Printf("%s portal cookie DB save warning: %v", cfg.Tag, err)
 	}
 
-	body, status, _, err = client.GET(cfg.MemberURL, map[string]string{"Referer": cfg.CookieURL})
+	body, status, finalURL, err := client.GET(cfg.MemberURL, map[string]string{"Referer": cfg.CookieURL})
 	if err != nil {
-		return fmt.Errorf("member page after chrome login: %w", err)
+		log.Printf("%s HTTP member check skipped (%v) — trusting Chrome session", cfg.Tag, err)
+		return nil
 	}
-	if status != 200 || httpclient.IsCloudflareChallenge(body) || needsLoginHTML(body) {
-		return fmt.Errorf("portal session invalid after Chrome login")
+	if httpclient.IsCloudflareChallenge(body) {
+		// HTTP client often re-triggers CF even with valid portal cookies; Chrome session is trusted.
+		log.Printf("%s HTTP verify hit Cloudflare — trusting Chrome session cookies", cfg.Tag)
+		return nil
+	}
+	if needsLoginHTML(body) {
+		return fmt.Errorf("portal session invalid after Chrome login (HTTP still shows login form at %s)", finalURL)
+	}
+	if status != 200 {
+		log.Printf("%s HTTP member status %d — trusting Chrome session", cfg.Tag, status)
+		return nil
+	}
+	if !isLoggedInHTML(body) {
+		log.Printf("%s HTTP member page has no standard dashboard markers — trusting Chrome session", cfg.Tag)
 	}
 	log.Printf("%s Chrome login OK — continuing with HTTP", cfg.Tag)
 	return nil
@@ -135,6 +152,12 @@ func chromeLogin(ctx context.Context, username, password string, cfg SessionConf
 	}
 
 	loggedIn, needForm := pollLoginState(page, 30*time.Second)
+	if !loggedIn && !needForm && cfg.LoginURL != "" {
+		log.Printf("%s opening login page %s", cfg.Tag, cfg.LoginURL)
+		_ = page.Timeout(30 * time.Second).Navigate(cfg.LoginURL)
+		time.Sleep(2 * time.Second)
+		loggedIn, needForm = pollLoginState(page, 20*time.Second)
+	}
 	if loggedIn {
 		log.Printf("%s already logged in via Chrome profile", cfg.Tag)
 		return exportCookies(page, cfg)
@@ -207,6 +230,28 @@ func chromeLogin(ctx context.Context, username, password string, cfg SessionConf
 	return cookies, nil
 }
 
+func applyPortalCookies(client *httpclient.Client, cfg SessionConfig, cookies []cookiesession.Cookie) {
+	httpCookies := cookiesession.ToHTTPCookies(cookies)
+	seen := map[string]bool{}
+	for _, raw := range []string{cfg.CookieURL, cfg.MemberURL} {
+		if raw == "" || seen[raw] {
+			continue
+		}
+		seen[raw] = true
+		_ = client.SetCookies(raw, httpCookies)
+	}
+}
+
+func hasMemberSessionCookies(cookies []cookiesession.Cookie) bool {
+	for _, c := range cookies {
+		name := strings.ToLower(c.Name)
+		if name == "amember_nr" || name == "amember_ru" || strings.HasPrefix(name, "amember_auth") {
+			return true
+		}
+	}
+	return false
+}
+
 func exportCookies(page *rod.Page, cfg SessionConfig) ([]cookiesession.Cookie, error) {
 	raw, err := page.Cookies([]string{})
 	if err != nil {
@@ -244,7 +289,7 @@ func pollLoginState(page *rod.Page, timeout time.Duration) (loggedIn, formFound 
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		if has, _, _ := page.Has("a[href*='logout'], #menu-member, .amember-dashboard"); has {
+		if has, _, _ := page.Has("a[href*='logout'], #menu-member, .amember-dashboard, .am-layout-content"); has {
 			return true, false
 		}
 		if has, _, _ := page.Has("input[name='amember_login'], input[name='amember_pass'], input[type='password']"); has {
@@ -286,8 +331,11 @@ func isLoggedInHTML(body string) bool {
 	}
 	lower := strings.ToLower(body)
 	return strings.Contains(lower, "amember-dashboard") ||
+		strings.Contains(lower, "menu-member") ||
+		strings.Contains(lower, "secure/member") ||
 		strings.Contains(lower, "/logout") ||
-		strings.Contains(lower, "your tools")
+		strings.Contains(lower, "your tools") ||
+		strings.Contains(lower, "your wallet")
 }
 
 func savePortalFromClient(ctx context.Context, client *httpclient.Client, cfg SessionConfig) error {
