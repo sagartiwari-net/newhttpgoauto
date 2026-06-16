@@ -20,18 +20,26 @@ import (
 )
 
 func preOpenSettle(tool ToolDef) time.Duration {
+	switch tool.WebsiteID {
+	case "airbrush":
+		return 7 * time.Second
+	}
 	if tool.SkipPageReload {
-		return 2 * time.Second
+		return 6 * time.Second
 	}
 	if tool.CaptureLocalStorage {
-		return 3 * time.Second
+		return 4 * time.Second
 	}
-	return 2 * time.Second
+	return 3 * time.Second
 }
 
 func postReloadSettle(tool ToolDef) time.Duration {
+	switch tool.WebsiteID {
+	case "airbrush":
+		return 5 * time.Second
+	}
 	if tool.CaptureLocalStorage {
-		return 3 * time.Second
+		return 4 * time.Second
 	}
 	return 4 * time.Second
 }
@@ -70,6 +78,9 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		log.Printf("[gfx_%s] ⚠️ GFX Extension not detected on page. Continuing anyway...", tool.WebsiteID)
 	} else {
 		log.Printf("[gfx_%s] ✅ GFX Extension active on page!", tool.WebsiteID)
+	}
+	if tool.CaptureLocalStorage {
+		time.Sleep(1 * time.Second)
 	}
 
 	// Dismiss dialogs/modals
@@ -212,7 +223,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	log.Printf("[gfx_%s] Root domain for cookies: %s", tool.WebsiteID, rootDomain)
 
 	if tool.SkipPageReload {
-		return captureSessionFast(ctx, newPage, tool, rootDomain, page, browser, dataDir)
+		if err := captureSessionFast(ctx, newPage, tool, rootDomain, page, browser, dataDir); err != nil {
+			log.Printf("[gfx_%s] Fast capture incomplete (%v) — falling back to reload capture", tool.WebsiteID, err)
+		} else {
+			return nil
+		}
 	}
 
 	// Attempt Cloudflare bypass if challenge is detected on target page
@@ -292,13 +307,18 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	log.Printf("[gfx_%s] Reloading page to trigger request headers...", tool.WebsiteID)
 	_ = newPage.Timeout(30 * time.Second).Reload()
 
-	// Wait up to ~5s for session token in request headers
-	for i := 0; i < 10; i++ {
+	headerPolls := 10
+	headerInterval := 500 * time.Millisecond
+	if len(tool.SessionCookieNames) > 0 || tool.WebsiteID == "airbrush" {
+		headerPolls = 15
+		headerInterval = 1 * time.Second
+	}
+	for i := 0; i < headerPolls; i++ {
 		if sessionTokenFound {
-			log.Printf("[gfx_%s] ✅ Session token confirmed in header stream at %.1fs", tool.WebsiteID, float64(i)*0.5)
+			log.Printf("[gfx_%s] ✅ Session token confirmed in header stream", tool.WebsiteID)
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(headerInterval)
 	}
 
 	if !sessionTokenFound {
@@ -442,40 +462,38 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 
 func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, rootDomain string, gfxPage *rod.Page, browser *rod.Browser, dataDir string) error {
 	settle := preOpenSettle(tool)
-	log.Printf("[gfx_%s] Fast capture — settle %s (no reload)...", tool.WebsiteID, settle)
-	time.Sleep(settle)
+	log.Printf("[gfx_%s] Fast capture — waiting up to %s for session...", tool.WebsiteID, settle)
 
-	rawCookies, err := cookiesForDomain(newPage, rootDomain)
-	if err != nil {
-		return err
-	}
-
+	deadline := time.Now().Add(settle)
+	var rawCookies []CookieJSON
 	localStorageData := map[string]interface{}{}
-	if tool.CaptureLocalStorage {
-		localStorageData = readLocalStorage(newPage)
-		log.Printf("[gfx_%s] Captured localStorage keys: %d", tool.WebsiteID, len(localStorageData))
+
+	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		var err error
+		rawCookies, err = cookiesForDomain(newPage, rootDomain)
+		if err != nil {
+			return err
+		}
+		if tool.CaptureLocalStorage {
+			localStorageData = readLocalStorage(newPage)
+		}
+		if airbrushSessionReady(rawCookies, localStorageData) || !tool.CaptureLocalStorage {
+			if tool.WebsiteID != "airbrush" || airbrushSessionReady(rawCookies, localStorageData) {
+				break
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	if tool.WebsiteID == "airbrush" {
-		hasLoginSet := false
-		for _, c := range rawCookies {
-			if c.Name == "loginSet" {
-				hasLoginSet = true
-				break
-			}
-		}
-		hasFirebase := false
-		for k := range localStorageData {
-			if strings.Contains(k, "firebase:authUser") {
-				hasFirebase = true
-				break
-			}
-		}
-		if !hasLoginSet && !hasFirebase {
-			saveErrorScreenshot(newPage, tool.WebsiteID, "no_session")
-			return fmt.Errorf("airbrush session not ready (no loginSet cookie or firebase auth)")
-		}
+	if tool.WebsiteID == "airbrush" && !airbrushSessionReady(rawCookies, localStorageData) {
+		saveErrorScreenshot(newPage, tool.WebsiteID, "no_session_fast")
+		return fmt.Errorf("airbrush session not ready (no loginSet cookie or firebase auth)")
 	}
+
+	log.Printf("[gfx_%s] Captured localStorage keys: %d, cookies: %d", tool.WebsiteID, len(localStorageData), len(rawCookies))
 
 	var cookieHeaderString string
 	if len(rawCookies) > 0 {
@@ -488,6 +506,22 @@ func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, ro
 
 	closeGFXPages(browser, gfxPage, newPage)
 	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString)
+}
+
+func airbrushSessionReady(rawCookies []CookieJSON, localStorageData map[string]interface{}) bool {
+	for _, c := range rawCookies {
+		if c.Name == "loginSet" {
+			return true
+		}
+	}
+	for k, v := range localStorageData {
+		if strings.Contains(k, "firebase:authUser") {
+			if s, ok := v.(string); ok && s != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func cookiesForDomain(page *rod.Page, rootDomain string) ([]CookieJSON, error) {
@@ -532,6 +566,9 @@ func saveCapturedSession(
 ) error {
 	if len(cookieHeaderString) < 50 && len(localStorageData) == 0 && len(indexedDBData) == 0 {
 		return fmt.Errorf("captured session data is empty or too short")
+	}
+	if tool.WebsiteID == "airbrush" && !airbrushSessionReady(rawCookies, localStorageData) {
+		return fmt.Errorf("airbrush session not ready (no loginSet cookie or firebase auth)")
 	}
 
 	referer := tool.Referer
