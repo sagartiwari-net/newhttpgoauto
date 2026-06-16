@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -29,9 +30,10 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	}
 
 	extPath := extensionDir()
-	headless := os.Getenv("GFX_VISIBLE") != "1"
-	log.Printf("[GFX] Launching Chrome account=%s headless=%v profile=%s ext=%s",
-		slot.Account.WebsiteID, headless, slot.ProfileDir, extPath)
+	// Visible by default on Mac worker for debugging; set GFX_HEADLESS=1 to hide window.
+	headless := os.Getenv("GFX_HEADLESS") == "1"
+	log.Printf("[GFX] Launching Chrome account=%s visible=%v profile=%s ext=%s",
+		slot.Account.WebsiteID, !headless, slot.ProfileDir, extPath)
 
 	l := launcher.New().
 		Headless(headless).
@@ -59,6 +61,10 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 func (s *Session) Close() {
 	if s == nil {
 		return
+	}
+	if os.Getenv("GFX_HEADLESS") != "1" || os.Getenv("GFX_KEEP_OPEN") == "1" {
+		log.Printf("[GFX] Keeping browser open 45s for inspection (account=%s)", s.slot.Account.WebsiteID)
+		time.Sleep(45 * time.Second)
 	}
 	log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
 	if s.browser != nil {
