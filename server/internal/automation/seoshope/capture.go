@@ -43,9 +43,9 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 		return "failed", err.Error()
 	}
 
-	page := s.Page()
-	shots := screenshotDir()
 	s.CloseExtraTabs()
+	page := s.EnsurePortalPage()
+	shots := screenshotDir()
 
 	log.Printf("[SEOShope] Navigating to /page/sem for access %s", slot.ButtonNum)
 	if err := page.Timeout(30*time.Second).Navigate(semPageURL); err != nil {

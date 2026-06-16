@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -80,24 +81,109 @@ func (s *Session) Close() {
 }
 
 func (s *Session) Browser() *rod.Browser { return s.browser }
-func (s *Session) Page() *rod.Page       { return s.page }
+func (s *Session) Page() *rod.Page       { return s.EnsurePortalPage() }
 func (s *Session) MarkLoggedIn()         { s.logged = true }
 func (s *Session) LoggedIn() bool        { return s.logged }
 
-func (s *Session) CloseExtraTabs() {
-	if s.browser == nil || s.page == nil {
-		return
+// EnsurePortalPage returns a live tab for portal work. After Semrush capture the
+// stored page target may be closed — recover from browser or open a new tab.
+func (s *Session) EnsurePortalPage() *rod.Page {
+	if s.browser == nil {
+		return s.page
 	}
-	mainID := s.page.TargetID
+	if s.page != nil {
+		if _, err := s.page.Info(); err == nil {
+			return s.page
+		}
+		log.Println("[SEOShope] Portal page target stale — recovering tab")
+	}
+
 	pages, err := s.browser.Pages()
-	if err != nil {
-		return
-	}
-	for _, p := range pages {
-		if p.TargetID != mainID {
-			_ = p.Close()
+	if err == nil {
+		var fallback *rod.Page
+		for _, p := range pages {
+			info, infoErr := p.Info()
+			if infoErr != nil {
+				continue
+			}
+			u := strings.ToLower(info.URL)
+			if strings.Contains(u, "seoshope.com") {
+				s.page = p
+				log.Printf("[SEOShope] Recovered portal tab: %s", info.URL)
+				return p
+			}
+			if fallback == nil {
+				fallback = p
+			}
+		}
+		if fallback != nil {
+			s.page = fallback
+			return fallback
 		}
 	}
+
+	log.Println("[SEOShope] Opening new portal tab")
+	s.page = stealth.MustPage(s.browser)
+	s.page.MustSetViewport(1920, 1080, 1, false)
+	s.page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+	})
+	attachTurnstileHijack(s.page)
+	return s.page
+}
+
+// HasMemberCookies checks member session cookies on any open browser tab.
+func (s *Session) HasMemberCookies() bool {
+	if s.browser == nil {
+		return false
+	}
+	pages, err := s.browser.Pages()
+	if err != nil {
+		return false
+	}
+	for _, p := range pages {
+		if hasMemberSessionCookie(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// CloseExtraTabs closes Semrush proxy tabs and keeps one live seoshope.com portal tab.
+func (s *Session) CloseExtraTabs() {
+	if s.browser == nil {
+		return
+	}
+	pages, err := s.browser.Pages()
+	if err != nil {
+		s.EnsurePortalPage()
+		return
+	}
+
+	var portal *rod.Page
+	for _, p := range pages {
+		info, infoErr := p.Info()
+		if infoErr != nil {
+			_ = p.Close()
+			continue
+		}
+		u := strings.ToLower(info.URL)
+		if strings.Contains(u, "seoshope.com") {
+			if portal == nil {
+				portal = p
+			} else {
+				_ = p.Close()
+			}
+			continue
+		}
+		_ = p.Close()
+	}
+
+	if portal != nil {
+		s.page = portal
+		return
+	}
+	s.EnsurePortalPage()
 }
 
 func (s *Session) WaitSettle() {

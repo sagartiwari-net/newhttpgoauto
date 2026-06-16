@@ -24,37 +24,29 @@ const (
 )
 
 func ensureLoggedIn(ctx context.Context, s *Session, username, password string) error {
-	page := s.Page()
+	page := s.EnsurePortalPage()
 	shots := screenshotDir()
 
-	// Reused Chrome from prior task in same profile run — skip login if still authenticated.
-	if s.LoggedIn() || isAuthenticated(page) {
-		if isAuthenticated(page) {
-			log.Println("[SEOShope] Session still logged in — skipping login")
-			s.MarkLoggedIn()
-			return nil
-		}
-		s.logged = false
+	// Prior task in same Chrome run — trust session flag + browser cookies, not stale page DOM.
+	if s.LoggedIn() || s.HasMemberCookies() {
+		log.Println("[SEOShope] Reusing logged-in Chrome session — skip login")
+		s.MarkLoggedIn()
+		return nil
 	}
 
-	if !isAuthenticated(page) {
-		if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
-			var params []*proto.NetworkCookieParam
-			if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {
-				_ = page.SetCookies(params)
-				log.Printf("[SEOShope] Restored %d saved portal cookies", len(params))
-			}
+	if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
+		var params []*proto.NetworkCookieParam
+		if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {
+			_ = page.SetCookies(params)
+			log.Printf("[SEOShope] Restored %d saved portal cookies", len(params))
 		}
 	}
 
-	// Only navigate to member if we are not already on an authenticated page.
-	if !isAuthenticated(page) {
-		_ = page.Timeout(30 * time.Second).Navigate(memberURL)
-		time.Sleep(2 * time.Second)
-		waitForPageReady(page, shots, 30*time.Second)
-	}
+	_ = page.Timeout(30 * time.Second).Navigate(memberURL)
+	time.Sleep(2 * time.Second)
+	waitForPageReady(page, shots, 30*time.Second)
 
-	if isAuthenticated(page) {
+	if isAuthenticated(page) || s.HasMemberCookies() {
 		log.Println("[SEOShope] Already logged in — no login needed")
 		s.MarkLoggedIn()
 		_ = savePortalCookies(ctx, page)
@@ -62,10 +54,18 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	}
 
 	if !isLoginPage(page) {
-		// Page may still be settling after redirect from a previous Semrush tab.
 		time.Sleep(2 * time.Second)
-		if isAuthenticated(page) {
-			log.Println("[SEOShope] Logged in after settle — skipping login")
+		page = s.EnsurePortalPage()
+		if isAuthenticated(page) || s.HasMemberCookies() {
+			log.Println("[SEOShope] Logged in after tab recovery — skipping login")
+			s.MarkLoggedIn()
+			return nil
+		}
+		// Last try: open member URL on fresh tab
+		page = s.EnsurePortalPage()
+		_ = page.Navigate(memberURL)
+		time.Sleep(3 * time.Second)
+		if isAuthenticated(page) || s.HasMemberCookies() {
 			s.MarkLoggedIn()
 			return nil
 		}
