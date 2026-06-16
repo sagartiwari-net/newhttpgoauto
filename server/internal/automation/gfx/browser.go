@@ -62,7 +62,7 @@ func (s *Session) Close() {
 	if s == nil {
 		return
 	}
-	if os.Getenv("GFX_HEADLESS") != "1" || os.Getenv("GFX_KEEP_OPEN") == "1" {
+	if os.Getenv("GFX_KEEP_OPEN") == "1" {
 		log.Printf("[GFX] Keeping browser open 45s for inspection (account=%s)", s.slot.Account.WebsiteID)
 		time.Sleep(45 * time.Second)
 	}

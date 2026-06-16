@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const taskTimeout = 12 * time.Minute
+const taskTimeout = 65 * time.Second
 
 // Run executes a GFX task with pool routing and parallel Chrome limits.
 func Run(taskUID string) (status, msg string) {

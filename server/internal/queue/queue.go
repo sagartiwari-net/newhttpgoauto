@@ -14,6 +14,8 @@ import (
 	"gohttpauto/internal/db"
 )
 
+const TaskRunTimeout = 70 * time.Second
+
 var (
 	activeMu  sync.Mutex
 	activeSet = map[string]bool{}
@@ -52,7 +54,7 @@ func Submit(taskUID, triggeredBy string) bool {
 		logID, _ := res.LastInsertId()
 		start := time.Now()
 
-		status, msg := Execute(taskUID, t.AutomationType)
+		status, msg := ExecuteWithTimeout(taskUID, t.AutomationType)
 
 		dur := int(time.Since(start).Milliseconds())
 		next := time.Now().Add(time.Duration(t.IntervalMinutes) * time.Minute)
@@ -97,7 +99,7 @@ func RunSync(taskUID, triggeredBy string) bool {
 	logID, _ := res.LastInsertId()
 	start := time.Now()
 
-	status, msg := Execute(taskUID, t.AutomationType)
+	status, msg := ExecuteWithTimeout(taskUID, t.AutomationType)
 
 	dur := int(time.Since(start).Milliseconds())
 	next := time.Now().Add(time.Duration(t.IntervalMinutes) * time.Minute)
@@ -107,6 +109,25 @@ func RunSync(taskUID, triggeredBy string) bool {
 	}
 	log.Printf("🏁 [QUEUE] %s → %s (%dms)", taskUID, status, dur)
 	return true
+}
+
+// ExecuteWithTimeout runs automation with a hard wall-clock limit.
+func ExecuteWithTimeout(taskUID, automationType string) (status, msg string) {
+	type result struct {
+		status, msg string
+	}
+	ch := make(chan result, 1)
+	go func() {
+		s, m := Execute(taskUID, automationType)
+		ch <- result{s, m}
+	}()
+	select {
+	case r := <-ch:
+		return r.status, r.msg
+	case <-time.After(TaskRunTimeout):
+		log.Printf("⏱️ [QUEUE] %s timed out after %s", taskUID, TaskRunTimeout)
+		return "failed", "task timeout after 70 seconds"
+	}
 }
 
 // Execute runs automation — HTTP engines plug in here.

@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	staleQueueAfter    = 15 * time.Minute
-	queueMaintainEvery = 1 * time.Minute
+	stalePendingAfter  = 15 * time.Minute
+	queueMaintainEvery = 15 * time.Second
 	workerHeartbeatKey = "worker:heartbeat"
 	workerAliveWindow  = 45 * time.Second
 )
@@ -149,30 +149,35 @@ func CancelJob(id int) (bool, error) {
 	return n > 0, nil
 }
 
-// ExpireStaleJobs marks old pending/claimed jobs as failed.
+// ExpireStaleJobs marks old pending/claimed jobs and running logs as failed.
 func ExpireStaleJobs() int {
 	cancelOrphanPending()
-	sec := int(staleQueueAfter.Seconds())
+	pendingSec := int(stalePendingAfter.Seconds())
+	runSec := int(TaskRunTimeout.Seconds())
+
 	res, _ := db.DB.Exec(`
 		UPDATE job_queue SET status='failed', finished_at=NOW()
-		WHERE status='pending' AND created_at < NOW() - INTERVAL ? SECOND`, sec)
+		WHERE status='pending' AND created_at < NOW() - INTERVAL ? SECOND`, pendingSec)
 	pending, _ := res.RowsAffected()
 
 	res2, _ := db.DB.Exec(`
 		UPDATE job_queue SET status='failed', finished_at=NOW()
 		WHERE status='claimed' AND claimed_at IS NOT NULL
-		  AND claimed_at < NOW() - INTERVAL ? SECOND`, sec)
+		  AND claimed_at < NOW() - INTERVAL ? SECOND`, runSec)
 	claimed, _ := res2.RowsAffected()
 
-	n := int(pending + claimed)
-	if n > 0 {
-		log.Printf("⏱️ [QUEUE] Expired %d stale job(s) (>15m)", n)
-	}
-	_, _ = db.DB.Exec(`
+	logs, _ := db.DB.Exec(`
 		UPDATE task_logs SET status='failed',
-			message=CONCAT(COALESCE(message,''), ' [auto-failed: queue timeout]')
-		WHERE status='running' AND created_at < NOW() - INTERVAL ? SECOND`, sec)
-	return n
+			message=CONCAT(COALESCE(message,''), ' [auto-failed: task timeout]'),
+			duration_ms=TIMESTAMPDIFF(MICROSECOND, created_at, NOW()) DIV 1000
+		WHERE status='running' AND created_at < NOW() - INTERVAL ? SECOND`, runSec)
+
+	n := int(pending + claimed)
+	logN, _ := logs.RowsAffected()
+	if n > 0 || logN > 0 {
+		log.Printf("⏱️ [QUEUE] Expired %d stale job(s), %d running log(s)", n, logN)
+	}
+	return n + int(logN)
 }
 
 // cancelOrphanPending fails pending jobs that are not GFX (panel runs those on the server now).
@@ -194,7 +199,7 @@ func StartQueueMaintenance() {
 			ExpireStaleJobs()
 		}
 	}()
-	log.Println("🧹 [QUEUE] Stale job cleanup started (15m timeout)")
+	log.Println("🧹 [QUEUE] Stale job cleanup started (70s run timeout)")
 }
 
 // StartJobPoller runs on worker — picks pending jobs from MySQL and executes locally.
