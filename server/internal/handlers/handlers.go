@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -148,6 +149,10 @@ func RunTask(c *gin.Context) {
 	}
 	if config.Global.Role == "panel" {
 		if err := queue.Enqueue(req.TaskUID, triggeredBy); err != nil {
+			if errors.Is(err, queue.ErrTaskBusy) {
+				c.JSON(http.StatusConflict, gin.H{"error": "Task is already running or queued"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue task: " + err.Error()})
 			return
 		}
@@ -155,10 +160,53 @@ func RunTask(c *gin.Context) {
 		return
 	}
 	if !queue.Submit(req.TaskUID, triggeredBy) {
-		c.JSON(http.StatusConflict, gin.H{"error": "task already running or queued"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Task is already running or queued"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Task started", "task_uid": req.TaskUID})
+}
+
+func ListQueue(c *gin.Context) {
+	jobs, err := queue.ListActiveJobs()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var running, pending []queue.JobRow
+	for _, j := range jobs {
+		if j.Status == "claimed" {
+			running = append(running, j)
+		} else {
+			pending = append(pending, j)
+		}
+	}
+	if running == nil {
+		running = []queue.JobRow{}
+	}
+	if pending == nil {
+		pending = []queue.JobRow{}
+	}
+	c.JSON(http.StatusOK, gin.H{"running": running, "pending": pending})
+}
+
+func CancelQueueJob(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid job id"})
+		return
+	}
+	ok, err := queue.CancelJob(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "job not found or not pending"})
+		return
+	}
+	claims := c.MustGet(middleware.CtxUserKey).(*auth.Claims)
+	logActivity(claims.Username, claims.Role, "QUEUE_CANCEL", "Cancelled job #"+strconv.Itoa(id), c.ClientIP())
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Pending job cancelled"})
 }
 
 // ─── Logs ────────────────────────────────────────────────────────────────────

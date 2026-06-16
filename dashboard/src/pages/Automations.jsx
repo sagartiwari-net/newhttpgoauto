@@ -29,7 +29,8 @@ export default function Automations() {
     try {
       await API.post('/tasks/run-manual', { task_uid: uid })
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to run')
+      const msg = e.response?.data?.error || 'Failed to run'
+      alert(msg)
     } finally {
       setRunning(null)
     }

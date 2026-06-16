@@ -33,6 +33,7 @@ func main() {
 		queue.StartJobPoller()
 		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
 	} else {
+		queue.StartQueueMaintenance()
 		log.Printf("🔧 [ROLE] panel — manual runs queued for worker Mac (no local execution)")
 	}
 	if cfg.EnableScheduler {
@@ -69,6 +70,8 @@ func main() {
 			protected.POST("/tasks/toggle", handlers.ToggleTask)
 			protected.POST("/tasks/interval", handlers.UpdateInterval)
 			protected.POST("/tasks/run-manual", handlers.RunTask)
+			protected.GET("/queue", handlers.ListQueue)
+			protected.DELETE("/queue/:id", handlers.CancelQueueJob)
 			protected.GET("/logs", handlers.ListLogs)
 			protected.GET("/credentials", handlers.ListCredentials)
 			protected.POST("/credentials", middleware.MasterOnly(), handlers.SaveCredential)

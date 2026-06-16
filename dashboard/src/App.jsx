@@ -1,8 +1,9 @@
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Zap, ScrollText, KeyRound, Users, LogOut, Cookie, Download } from 'lucide-react'
+import { LayoutDashboard, Zap, ScrollText, KeyRound, Users, LogOut, Cookie, Download, ListOrdered } from 'lucide-react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Automations from './pages/Automations'
+import Queue from './pages/Queue'
 import Logs from './pages/Logs'
 import Credentials from './pages/Credentials'
 import Sessions from './pages/Sessions'
@@ -42,6 +43,9 @@ function Shell({ children }) {
           </NavLink>
           <NavLink to="/automations" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <Zap size={18} /> Automations
+          </NavLink>
+          <NavLink to="/queue" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <ListOrdered size={18} /> Queue
           </NavLink>
           <NavLink to="/logs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <ScrollText size={18} /> Logs
@@ -84,6 +88,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/automations" element={<Automations />} />
+              <Route path="/queue" element={<Queue />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/credentials" element={<Credentials />} />
               <Route path="/sessions" element={<Sessions />} />

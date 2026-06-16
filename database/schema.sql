@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `job_queue` (
   `id`           INT AUTO_INCREMENT PRIMARY KEY,
   `task_uid`     VARCHAR(100) NOT NULL,
   `triggered_by` VARCHAR(100) NOT NULL DEFAULT 'manual',
-  `status`       ENUM('pending','claimed','done') NOT NULL DEFAULT 'pending',
+  `status`       ENUM('pending','claimed','done','failed','cancelled') NOT NULL DEFAULT 'pending',
   `claimed_by`   VARCHAR(100) DEFAULT NULL,
   `claimed_at`   DATETIME DEFAULT NULL,
   `finished_at`  DATETIME DEFAULT NULL,
