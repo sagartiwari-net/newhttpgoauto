@@ -123,6 +123,19 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
   INDEX `idx_activity_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ─── Job queue (panel enqueues → worker Mac executes) ────────────────────────
+CREATE TABLE IF NOT EXISTS `job_queue` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `task_uid`     VARCHAR(100) NOT NULL,
+  `triggered_by` VARCHAR(100) NOT NULL DEFAULT 'manual',
+  `status`       ENUM('pending','claimed','done') NOT NULL DEFAULT 'pending',
+  `claimed_by`   VARCHAR(100) DEFAULT NULL,
+  `claimed_at`   DATETIME DEFAULT NULL,
+  `finished_at`  DATETIME DEFAULT NULL,
+  `created_at`   DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_job_status` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ─── Seed: first Nox HTTP automation task ────────────────────────────────────
 INSERT INTO `tasks` (`task_uid`, `task_name`, `website_group`, `automation_type`, `interval_minutes`, `is_enabled`) VALUES
 ('nox_runSemrush', 'Semrush (NoxTools)', 'nox', 'http', 20, 0)

@@ -21,6 +21,7 @@ type Config struct {
 	APIKey           string
 	LogRetentionDays int
 	EnableScheduler  bool
+	Role             string // "panel" = enqueue only, "worker" = execute jobs
 }
 
 var Global *Config
@@ -35,6 +36,7 @@ func Load() *Config {
 		"API_KEY": "gohttp_secret_token_change_me",
 		"LOG_RETENTION_DAYS": "2",
 		"ENABLE_SCHEDULER":   "true",
+		"ROLE":               "worker",
 	}
 	if f, err := os.Open(".env"); err == nil {
 		defer f.Close()
@@ -64,6 +66,10 @@ func Load() *Config {
 		retention = 2
 	}
 	enableSched := strings.EqualFold(lookup("ENABLE_SCHEDULER", "true"), "true")
+	role := strings.ToLower(lookup("ROLE", "worker"))
+	if role != "panel" && role != "worker" {
+		role = "worker"
+	}
 	Global = &Config{
 		DBHost: lookup("DB_HOST", "127.0.0.1"),
 		DBPort: lookup("DB_PORT", "3306"),
@@ -78,6 +84,7 @@ func Load() *Config {
 		APIKey:         lookup("API_KEY", ""),
 		LogRetentionDays: retention,
 		EnableScheduler:  enableSched,
+		Role:             role,
 	}
 	return Global
 }

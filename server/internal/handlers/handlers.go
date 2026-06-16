@@ -146,11 +146,19 @@ func RunTask(c *gin.Context) {
 	} else if claims, ok := c.Get(middleware.CtxUserKey); ok {
 		triggeredBy = claims.(*auth.Claims).Username
 	}
+	if config.Global.Role == "panel" {
+		if err := queue.Enqueue(req.TaskUID, triggeredBy); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue task: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Task queued for worker Mac", "task_uid": req.TaskUID, "status": "queued"})
+		return
+	}
 	if !queue.Submit(req.TaskUID, triggeredBy) {
 		c.JSON(http.StatusConflict, gin.H{"error": "task already running or queued"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Task enqueued", "task_uid": req.TaskUID})
+	c.JSON(http.StatusOK, gin.H{"message": "Task started", "task_uid": req.TaskUID})
 }
 
 // ─── Logs ────────────────────────────────────────────────────────────────────

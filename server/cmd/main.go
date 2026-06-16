@@ -10,6 +10,7 @@ import (
 	"gohttpauto/internal/db"
 	"gohttpauto/internal/handlers"
 	"gohttpauto/internal/middleware"
+	"gohttpauto/internal/queue"
 	"gohttpauto/internal/scheduler"
 
 	"github.com/gin-contrib/cors"
@@ -26,6 +27,12 @@ func main() {
 
 	handlers.EnsureMasterUser(cfg.MasterUsername, cfg.MasterPassword)
 	handlers.StartLogCleanupLoop()
+	if cfg.Role == "worker" {
+		queue.StartJobPoller()
+		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
+	} else {
+		log.Printf("🔧 [ROLE] panel — manual runs queued for worker Mac (no local execution)")
+	}
 	if cfg.EnableScheduler {
 		scheduler.Start()
 	} else {
