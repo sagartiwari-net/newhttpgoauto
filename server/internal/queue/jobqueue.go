@@ -13,8 +13,10 @@ import (
 const (
 	stalePendingAfter  = 15 * time.Minute
 	queueMaintainEvery = 15 * time.Second
+	queuePollInterval  = 1 * time.Second
 	workerHeartbeatKey = "worker:heartbeat"
-	workerAliveWindow  = 45 * time.Second
+	workerAliveWindow  = 90 * time.Second
+	workerHeartbeatEvery = 5 * time.Second
 )
 
 var ErrTaskBusy = errors.New("task already running or queued")
@@ -205,10 +207,11 @@ func StartQueueMaintenance() {
 // StartJobPoller runs on worker — picks pending jobs from MySQL and executes locally.
 func StartJobPoller() {
 	StartQueueMaintenance()
+	go startWorkerHeartbeat()
 	go func() {
-		log.Printf("👂 [WORKER] Job poller started (3s interval, id=%s)", workerID())
-		pollOnce() // claim immediately — don't wait for first tick
-		ticker := time.NewTicker(3 * time.Second)
+		log.Printf("👂 [WORKER] Job poller started (%s interval, id=%s)", queuePollInterval, workerID())
+		pollOnce()
+		ticker := time.NewTicker(queuePollInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			pollOnce()
@@ -216,8 +219,18 @@ func StartJobPoller() {
 	}()
 }
 
-func pollOnce() {
+func startWorkerHeartbeat() {
 	touchWorkerHeartbeat()
+	go func() {
+		ticker := time.NewTicker(workerHeartbeatEvery)
+		defer ticker.Stop()
+		for range ticker.C {
+			touchWorkerHeartbeat()
+		}
+	}()
+}
+
+func pollOnce() {
 	ExpireStaleJobs()
 	for {
 		var id int

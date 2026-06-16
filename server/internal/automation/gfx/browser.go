@@ -41,6 +41,7 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 		Set("disable-setuid-sandbox").
 		Set("disable-dev-shm-usage").
 		Set("disable-gpu").
+		Set("blink-settings", "imagesEnabled=false").
 		Set("disable-popup-blocking").
 		Set("disable-features", "IsolateOrigins,site-per-process").
 		Set("disable-blink-features", "AutomationControlled").
@@ -55,6 +56,7 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 
 	sessCtx, cancel := context.WithCancel(ctx)
 	browser := rod.New().ControlURL(u).MustConnect().Context(sessCtx)
+	logGFXNetworkFilterOnce()
 	return &Session{slot: slot, browser: browser, cancel: cancel}, nil
 }
 
@@ -81,6 +83,7 @@ func (s *Session) Slot() Slot            { return s.slot }
 
 func (s *Session) newPage() *rod.Page {
 	page := stealth.MustPage(s.browser)
+	attachGFXNetworkFilter(page)
 	page.MustSetViewport(1920, 1080, 1, false)
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
