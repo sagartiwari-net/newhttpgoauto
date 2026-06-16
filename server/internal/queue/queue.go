@@ -7,6 +7,7 @@ import (
 
 	"gohttpauto/internal/automation/azad"
 	"gohttpauto/internal/automation/nox"
+	"gohttpauto/internal/automation/toolbaazar"
 	"gohttpauto/internal/db"
 )
 
@@ -112,6 +113,8 @@ func Execute(taskUID, automationType string) (status, msg string) {
 		return nox.RunSemrush()
 	case "azad_runAzadSemrush":
 		return azad.RunSemrush()
+	case "toolbaazar_runToolbaazarSemrush":
+		return toolbaazar.RunSemrush()
 	default:
 		return "failed", "automation not implemented yet: " + taskUID
 	}

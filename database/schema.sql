@@ -139,5 +139,6 @@ CREATE TABLE IF NOT EXISTS `job_queue` (
 -- ─── Seed: HTTP automation tasks ───────────────────────────────────────────────
 INSERT INTO `tasks` (`task_uid`, `task_name`, `website_group`, `automation_type`, `interval_minutes`, `is_enabled`) VALUES
 ('nox_runSemrush', 'Semrush (NoxTools)', 'nox', 'http', 20, 0),
-('azad_runAzadSemrush', 'Semrush (Azad)', 'azad', 'http', 60, 0)
+('azad_runAzadSemrush', 'Semrush (Azad)', 'azad', 'http', 60, 0),
+('toolbaazar_runToolbaazarSemrush', 'Semrush (Toolbaazar)', 'toolbaazar', 'http', 60, 0)
 ON DUPLICATE KEY UPDATE task_name = VALUES(task_name);

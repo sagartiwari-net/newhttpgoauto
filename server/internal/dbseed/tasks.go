@@ -19,6 +19,7 @@ type TaskDef struct {
 var DefaultTasks = []TaskDef{
 	{UID: "nox_runSemrush", Name: "Semrush (NoxTools)", Group: "nox", AutomationType: "http", IntervalMin: 20},
 	{UID: "azad_runAzadSemrush", Name: "Semrush (Azad)", Group: "azad", AutomationType: "http", IntervalMin: 60},
+	{UID: "toolbaazar_runToolbaazarSemrush", Name: "Semrush (Toolbaazar)", Group: "toolbaazar", AutomationType: "http", IntervalMin: 60},
 }
 
 // EnsureTasks inserts missing tasks; existing rows are left unchanged.

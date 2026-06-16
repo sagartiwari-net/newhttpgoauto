@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -103,6 +104,32 @@ func (c *Client) POST(rawURL, postBody string, extra map[string]string) (finalUR
 	c.refreshCaptured()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	return resp.Request.URL.String(), string(data), resp.StatusCode, nil
+}
+
+func (c *Client) SetCookies(rawURL string, cookies []*http.Cookie) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	c.HTTP.Jar.SetCookies(u, cookies)
+	return nil
+}
+
+func (c *Client) CookiesFor(rawURL string) ([]*http.Cookie, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	src := c.HTTP.Jar.Cookies(u)
+	out := make([]*http.Cookie, 0, len(src))
+	for _, c := range src {
+		cp := *c
+		if cp.Domain == "" {
+			cp.Domain = u.Hostname()
+		}
+		out = append(out, &cp)
+	}
+	return out, nil
 }
 
 func ParseAttemptID(html string) (string, error) {

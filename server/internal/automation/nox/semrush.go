@@ -31,29 +31,42 @@ func RunSemrush() (string, string) {
 	}
 
 	client := httpclient.New(60 * time.Second)
+	portalSessionID := "noxtools_login"
+	if saved, err := cookiesession.Load(ctx, portalSessionID); err == nil && len(saved) > 0 {
+		_ = client.SetCookies("https://noxtools.com/", cookiesession.ToHTTPCookies(saved))
+		log.Printf("[Nox] restored %d portal cookies", len(saved))
+	}
 
 	loginURL := "https://noxtools.com/secure/login"
 	body, status, _, err := client.GET(loginURL, nil)
 	if err != nil || status != 200 {
 		return "failed", fmt.Sprintf("login page error: %v", err)
 	}
-	attemptID, err := httpclient.ParseAttemptID(body)
-	if err != nil {
-		return "failed", err.Error()
-	}
 
-	form := url.Values{}
-	form.Set("amember_login", email)
-	form.Set("amember_pass", password)
-	form.Set("login_attempt_id", attemptID)
-	form.Set("_referer", "https://noxtools.com/")
-	finalURL, postBody, _, err := client.POST(loginURL, form.Encode(), map[string]string{
-		"Content-Type": "application/x-www-form-urlencoded",
-		"Origin":       "https://noxtools.com",
-		"Referer":      loginURL,
-	})
-	if err != nil || !noxLoginOK(finalURL, postBody) {
-		return "failed", "noxtools login failed"
+	needsLogin := strings.Contains(strings.ToLower(body), `name="amember_login"`) ||
+		strings.Contains(strings.ToLower(body), `id="amember-login"`)
+	if needsLogin {
+		attemptID, err := httpclient.ParseAttemptID(body)
+		if err != nil {
+			return "failed", err.Error()
+		}
+
+		form := url.Values{}
+		form.Set("amember_login", email)
+		form.Set("amember_pass", password)
+		form.Set("login_attempt_id", attemptID)
+		form.Set("_referer", "https://noxtools.com/")
+		finalURL, postBody, _, err := client.POST(loginURL, form.Encode(), map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+			"Origin":       "https://noxtools.com",
+			"Referer":      loginURL,
+		})
+		if err != nil || !noxLoginOK(finalURL, postBody) {
+			return "failed", "noxtools login failed"
+		}
+	}
+	if err := savePortalSession(ctx, client, portalSessionID, "https://noxtools.com/"); err != nil {
+		log.Printf("⚠️ [Nox] portal cookie save failed: %v", err)
 	}
 
 	semPage := "https://noxtools.com/secure/page/semrush"
@@ -146,4 +159,30 @@ func uploadCookies(netscape string) {
 		return
 	}
 	resp.Body.Close()
+}
+
+func savePortalSession(ctx context.Context, client *httpclient.Client, websiteID, referer string) error {
+	raw, err := client.CookiesFor(referer)
+	if err != nil {
+		return err
+	}
+	cookies := make([]cookiesession.Cookie, 0, len(raw))
+	for _, c := range raw {
+		if c == nil || c.Name == "" {
+			continue
+		}
+		exp := c.Expires
+		if exp.IsZero() {
+			exp = time.Now().Add(24 * time.Hour)
+		}
+		cookies = append(cookies, cookiesession.SimpleCookie(c.Domain, c.Name, c.Value, c.Secure, c.HttpOnly, exp))
+	}
+	if len(cookies) == 0 {
+		return nil
+	}
+	return cookiesession.Save(ctx, cookiesession.SaveOptions{
+		WebsiteID: websiteID,
+		Referer:   referer,
+		Cookies:   cookies,
+	})
 }
