@@ -19,39 +19,58 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
-func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
+func preOpenSettle(tool ToolDef) time.Duration {
+	if tool.SkipPageReload {
+		return 2 * time.Second
+	}
+	if tool.CaptureLocalStorage {
+		return 3 * time.Second
+	}
+	return 2 * time.Second
+}
+
+func postReloadSettle(tool ToolDef) time.Duration {
+	if tool.CaptureLocalStorage {
+		return 3 * time.Second
+	}
+	return 4 * time.Second
+}
+
+func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *rod.Page) error {
 	log.Printf("🏁 [gfx_%s] Starting GFX %s automation...", tool.WebsiteID, tool.Name)
 
-	page := session.newPage()
+	var page *rod.Page
+	if gfxPage != nil {
+		page = gfxPage
+		if info, err := page.Info(); err != nil || !strings.Contains(info.URL, "/tools/") {
+			log.Printf("🧭 [gfx_%s] Navigating to tool page: %s", tool.WebsiteID, tool.ToolURL)
+			_ = page.Timeout(30 * time.Second).Navigate(tool.ToolURL)
+		}
+	} else {
+		page = session.newPage()
+		log.Printf("🧭 [gfx_%s] Navigating to tool access page: %s", tool.WebsiteID, tool.ToolURL)
+		_ = page.Timeout(45 * time.Second).Navigate(tool.ToolURL)
+	}
+
 	dataDir := dataRoot()
 	browser := session.Browser()
-
-	// Access Tool Page
-	var err error
-	log.Printf("🧭 [gfx_%s] Navigating to tool access page: %s", tool.WebsiteID, tool.ToolURL)
-	err = page.Timeout(45 * time.Second).Navigate(tool.ToolURL)
-	if err != nil {
-		log.Printf("⚠️ [gfx_%s] Tool page navigation failed: %v", tool.WebsiteID, err)
-	}
-	time.Sleep(1 * time.Second)
 
 	// Wait for GFX Chrome extension to inject into page
 	log.Printf("[gfx_%s] Waiting for extension to inject...", tool.WebsiteID)
 	extDetected := false
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 20; i++ {
 		res, err := page.Eval(`() => document.documentElement.hasAttribute('data-my-extension-installed')`)
 		if err == nil && res.Value.Bool() {
 			extDetected = true
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 	}
 	if !extDetected {
 		log.Printf("[gfx_%s] ⚠️ GFX Extension not detected on page. Continuing anyway...", tool.WebsiteID)
 	} else {
 		log.Printf("[gfx_%s] ✅ GFX Extension active on page!", tool.WebsiteID)
 	}
-	time.Sleep(3 * time.Second)
 
 	// Dismiss dialogs/modals
 	_, _ = page.Eval(`() => {
@@ -61,20 +80,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 			try { b.click(); } catch(e) {}
 		});
 	}`)
-	time.Sleep(1 * time.Second)
-
-	// Scroll to lazy-render extension buttons
-	log.Printf("[gfx_%s] Scrolling page to trigger lazy buttons...", tool.WebsiteID)
-	_, _ = page.Eval(`async () => {
-		const step = 400;
-		const maxY = document.body.scrollHeight;
-		for (let y = 0; y < maxY; y += step) {
-			window.scrollTo(0, y);
-			await new Promise(r => setTimeout(r, 150));
-		}
-		window.scrollTo(0, 0);
-	}`)
-	time.Sleep(1 * time.Second)
+	time.Sleep(150 * time.Millisecond)
 
 	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
 	btnFound := false
@@ -82,14 +88,13 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	var useFallback bool
 	actualIndex := tool.FallbackIndex
 
-	for idxPoll := 0; idxPoll < 20; idxPoll++ {
+	for idxPoll := 0; idxPoll < 16; idxPoll++ {
 		hasBtn, _, _ := page.Has(tool.Selector)
 		if hasBtn {
 			btnFound = true
 			btnSelectorClicked = tool.Selector
 			break
 		}
-		// Check fallback
 		resCheck, errCheck := page.Eval(`(idx) => {
 			const list = document.querySelectorAll('button[data-tool-cookie="true"]');
 			if (list.length > idx) return { found: true, actualIndex: idx };
@@ -105,7 +110,14 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 			}
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		if idxPoll == 4 && !btnFound {
+			log.Printf("[gfx_%s] Scrolling page to trigger lazy buttons...", tool.WebsiteID)
+			_, _ = page.Eval(`() => {
+				window.scrollTo(0, document.body.scrollHeight);
+				window.scrollTo(0, 0);
+			}`)
+		}
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	if !btnFound {
@@ -169,7 +181,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	// Wait for new page URL to resolve
 	log.Printf("[gfx_%s] Waiting for new tab navigation...", tool.WebsiteID)
 	var newPageUrl string
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 24; i++ {
 		if ctx.Err() != nil {
 			return fmt.Errorf("context expired waiting for new tab URL: %w", ctx.Err())
 		}
@@ -179,7 +191,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 				break
 			}
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 	}
 	log.Printf("[gfx_%s] Target page active! URL: %s", tool.WebsiteID, newPageUrl)
 
@@ -199,12 +211,16 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	rootDomain := strings.Join(parts, ".")
 	log.Printf("[gfx_%s] Root domain for cookies: %s", tool.WebsiteID, rootDomain)
 
+	if tool.SkipPageReload {
+		return captureSessionFast(ctx, newPage, tool, rootDomain, page, browser, dataDir)
+	}
+
 	// Attempt Cloudflare bypass if challenge is detected on target page
 	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
 
-	// Settle wait of 5 seconds (after potential CF bypass)
-	log.Printf("[gfx_%s] Settle wait of 5 seconds...", tool.WebsiteID)
-	time.Sleep(5 * time.Second)
+	settle := preOpenSettle(tool)
+	log.Printf("[gfx_%s] Settle wait %s before capture...", tool.WebsiteID, settle)
+	time.Sleep(settle)
 
 	// Intercept request cookies via CDP
 	_ = proto.NetworkEnable{}.Call(newPage)
@@ -276,22 +292,22 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	log.Printf("[gfx_%s] Reloading page to trigger request headers...", tool.WebsiteID)
 	_ = newPage.Timeout(30 * time.Second).Reload()
 
-	// Wait up to 25s for session token in request headers
-	// (Some SPAs set auth cookies via JS/XHR after page load — need extra time)
-	for i := 0; i < 25; i++ {
+	// Wait up to ~5s for session token in request headers
+	for i := 0; i < 10; i++ {
 		if sessionTokenFound {
-			log.Printf("[gfx_%s] ✅ Session token confirmed in header stream at second %d", tool.WebsiteID, i)
+			log.Printf("[gfx_%s] ✅ Session token confirmed in header stream at %.1fs", tool.WebsiteID, float64(i)*0.5)
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	if !sessionTokenFound {
-		log.Printf("[gfx_%s] ⚠️ Session token not found in headers after 25s — continuing with jar-only cookies", tool.WebsiteID)
+		log.Printf("[gfx_%s] ⚠️ Session token not found in headers — continuing with jar-only cookies", tool.WebsiteID)
 	}
 
-	log.Printf("[gfx_%s] Waiting 12 seconds for page to fully settle (JS-set cookies)...", tool.WebsiteID)
-	time.Sleep(12 * time.Second)
+	settleAfter := postReloadSettle(tool)
+	log.Printf("[gfx_%s] Post-reload settle %s...", tool.WebsiteID, settleAfter)
+	time.Sleep(settleAfter)
 
 	// Fetch all cookies from standard jar
 	log.Printf("[gfx_%s] Fetching cookie jar...", tool.WebsiteID)
@@ -368,10 +384,10 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		log.Printf("[gfx_%s] Captured localStorage keys count: %d", tool.WebsiteID, len(localStorageData))
 	}
 
-	// IndexedDB capture (optional)
+	// IndexedDB capture (optional) — skip when empty map is enough
 	var indexedDBData = make(map[string]interface{})
 	if tool.CaptureIndexedDB {
-		resIDB, errIDB := newPage.Eval(`async () => {
+		resIDB, errIDB := newPage.Timeout(5 * time.Second).Eval(`async () => {
 			const result = {};
 			try {
 				const dbs = await indexedDB.databases();
@@ -409,12 +425,55 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		log.Printf("[gfx_%s] Captured IndexedDB databases count: %d", tool.WebsiteID, len(indexedDBData))
 	}
 
-	// Close other pages/tabs opened during the lease
-	if pages, err := browser.Pages(); err == nil {
-		for _, p := range pages {
-			if p.TargetID != page.TargetID {
-				_ = p.Close()
+	var cookieHeaderString string
+	if len(rawCookies) > 0 {
+		var pairs []string
+		for _, c := range rawCookies {
+			pairs = append(pairs, fmt.Sprintf("%s=%s", c.Name, c.Value))
+		}
+		cookieHeaderString = strings.Join(pairs, "; ")
+	}
+
+	// Close tool tabs before DB save so Chrome shuts down faster after task ends.
+	closeGFXPages(browser, page, newPage)
+
+	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, indexedDBData, cookieHeaderString)
+}
+
+func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, rootDomain string, gfxPage *rod.Page, browser *rod.Browser, dataDir string) error {
+	settle := preOpenSettle(tool)
+	log.Printf("[gfx_%s] Fast capture — settle %s (no reload)...", tool.WebsiteID, settle)
+	time.Sleep(settle)
+
+	rawCookies, err := cookiesForDomain(newPage, rootDomain)
+	if err != nil {
+		return err
+	}
+
+	localStorageData := map[string]interface{}{}
+	if tool.CaptureLocalStorage {
+		localStorageData = readLocalStorage(newPage)
+		log.Printf("[gfx_%s] Captured localStorage keys: %d", tool.WebsiteID, len(localStorageData))
+	}
+
+	if tool.WebsiteID == "airbrush" {
+		hasLoginSet := false
+		for _, c := range rawCookies {
+			if c.Name == "loginSet" {
+				hasLoginSet = true
+				break
 			}
+		}
+		hasFirebase := false
+		for k := range localStorageData {
+			if strings.Contains(k, "firebase:authUser") {
+				hasFirebase = true
+				break
+			}
+		}
+		if !hasLoginSet && !hasFirebase {
+			saveErrorScreenshot(newPage, tool.WebsiteID, "no_session")
+			return fmt.Errorf("airbrush session not ready (no loginSet cookie or firebase auth)")
 		}
 	}
 
@@ -427,11 +486,54 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		cookieHeaderString = strings.Join(pairs, "; ")
 	}
 
+	closeGFXPages(browser, gfxPage, newPage)
+	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString)
+}
+
+func cookiesForDomain(page *rod.Page, rootDomain string) ([]CookieJSON, error) {
+	resp, err := proto.NetworkGetAllCookies{}.Call(page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch cookies from jar: %w", err)
+	}
+	var out []CookieJSON
+	for _, c := range resp.Cookies {
+		if strings.Contains(c.Domain, rootDomain) {
+			out = append(out, formatCookieForExtension(c))
+		}
+	}
+	return out, nil
+}
+
+func readLocalStorage(page *rod.Page) map[string]interface{} {
+	data := make(map[string]interface{})
+	resLS, errLS := page.Eval(`() => {
+		const data = {};
+		try {
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				data[key] = localStorage.getItem(key);
+			}
+		} catch(e) {}
+		return data;
+	}`)
+	if errLS == nil {
+		_ = resLS.Value.Unmarshal(&data)
+	}
+	return data
+}
+
+func saveCapturedSession(
+	ctx context.Context,
+	tool ToolDef,
+	dataDir, rootDomain string,
+	rawCookies []CookieJSON,
+	localStorageData, indexedDBData map[string]interface{},
+	cookieHeaderString string,
+) error {
 	if len(cookieHeaderString) < 50 && len(localStorageData) == 0 && len(indexedDBData) == 0 {
 		return fmt.Errorf("captured session data is empty or too short")
 	}
 
-	// Format output payloads
 	referer := tool.Referer
 	if referer == "" {
 		referer = fmt.Sprintf("https://www.%s/", rootDomain)
@@ -448,6 +550,9 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		}
 		jsonBytes, _ = json.MarshalIndent(extensionPayload, "", "  ")
 	} else {
+		if indexedDBData == nil {
+			indexedDBData = map[string]interface{}{}
+		}
 		payload := map[string]interface{}{
 			"referer":         referer,
 			"includedFormats": []string{"cookies"},
@@ -467,9 +572,8 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	netscapeStr := cookiesToNetscape(rawCookies)
 	headerStr := cookieHeaderString
 
-	// Save to DB in shared_sessions
 	log.Printf("[gfx_%s] Saving storage payload to DB under %s...", tool.WebsiteID, tool.WebsiteID)
-	_, err = db.DB.ExecContext(ctx, `
+	_, err := db.DB.ExecContext(ctx, `
 		INSERT INTO shared_sessions (website_id, cookies_json, cookies_netscape, cookies_header, updated_at)
 		VALUES (?, ?, ?, ?, NOW())
 		ON DUPLICATE KEY UPDATE
@@ -482,13 +586,10 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		return fmt.Errorf("failed to save cookies to shared_sessions DB: %w", err)
 	}
 
-	// Save local backup file
 	backupFile := filepath.Join(dataDir, "cookies", tool.BackupFile)
 	_ = os.MkdirAll(filepath.Dir(backupFile), 0755)
 	_ = os.WriteFile(backupFile, jsonBytes, 0644)
-	log.Printf("[gfx_%s] Local JSON backup cookie file saved to: %s", tool.WebsiteID, backupFile)
 
-	// Notify 1Clk Access extension system before task closes (auto cookie update + tool_status active)
 	taskUID := tool.TaskUID
 	if taskUID == "" {
 		taskUID = "gfx_run" + strings.Title(tool.WebsiteID)
@@ -497,10 +598,32 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	if toolID == "" {
 		toolID = tool.WebsiteID
 	}
-	notify1clkWebhook(taskUID, toolID, tool.WebsiteID, string(jsonBytes))
+	payload := string(jsonBytes)
+	go notify1clkWebhook(taskUID, toolID, tool.WebsiteID, payload)
 
 	log.Printf("🎉 [gfx_%s] GFX %s automation completed successfully!", tool.WebsiteID, tool.Name)
 	return nil
+}
+
+func closeGFXPages(browser *rod.Browser, pages ...*rod.Page) {
+	keep := make(map[proto.TargetTargetID]bool)
+	for _, p := range pages {
+		if p != nil {
+			keep[p.TargetID] = true
+		}
+	}
+	if all, err := browser.Pages(); err == nil {
+		for _, p := range all {
+			if !keep[p.TargetID] {
+				_ = p.Close()
+			}
+		}
+	}
+	for _, p := range pages {
+		if p != nil {
+			_ = p.Close()
+		}
+	}
 }
 
 // handleTargetPageCloudflare detects a Cloudflare challenge on the SSO-opened target page

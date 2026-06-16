@@ -6,14 +6,22 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/go-rod/rod"
 )
 
-func ensureGFXLogin(ctx context.Context, session *Session) error {
+// ensureGFXLogin opens GFX portal (or tool page) and logs in if needed.
+// Returns the page left on the tool portal for reuse by runExtension.
+func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*rod.Page, error) {
 	page := session.newPage()
 	slot := session.Slot()
 	username := slot.Account.Username
 	password := slot.Account.Password
 	accountID := slot.Account.WebsiteID
+
+	if startURL == "" {
+		startURL = "https://app.gfxtoolz.ai/signin"
+	}
 
 	safeURL := func() string {
 		if ctx.Err() != nil {
@@ -36,62 +44,43 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 		return info.Title
 	}
 
-	log.Printf("[gfx_%s] Navigating to GFXToolz login...", slot.Account.WebsiteID)
-	if err := page.Timeout(60 * time.Second).Navigate("https://app.gfxtoolz.ai/signin"); err != nil {
+	log.Printf("[gfx_%s] Opening GFX portal: %s", slot.Account.WebsiteID, startURL)
+	if err := page.Timeout(45 * time.Second).Navigate(startURL); err != nil {
 		log.Printf("[gfx_%s] Navigation warning: %v", slot.Account.WebsiteID, err)
 	}
 	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	time.Sleep(3 * time.Second)
-
-	alreadyLoggedIn := false
-	if u := safeURL(); u != "" && !strings.Contains(u, "signin") {
-		log.Printf("[gfx_%s] Already logged in", slot.Account.WebsiteID)
-		return nil
+		return nil, ctx.Err()
 	}
 
-	log.Printf("[gfx_%s] Waiting for login form...", slot.Account.WebsiteID)
-	loaded := false
-	pageReloaded := false
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 20; i++ {
 		if ctx.Err() != nil {
-			return fmt.Errorf("context expired waiting for login form: %w", ctx.Err())
+			return nil, ctx.Err()
+		}
+		u := safeURL()
+		if u != "" && !strings.Contains(u, "signin") {
+			log.Printf("[gfx_%s] Already logged in (%s)", slot.Account.WebsiteID, u)
+			return page, nil
 		}
 		hasEmail, _, _ := page.Has("input[type='email']")
 		if hasEmail {
-			loaded = true
-			break
-		}
-		urlNow := safeURL()
-		if urlNow != "" && !strings.Contains(urlNow, "signin") {
-			alreadyLoggedIn = true
-			loaded = true
 			break
 		}
 		title := safeTitle()
 		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
 			solveCloudflare(page)
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 			continue
 		}
-		if i == 10 && !pageReloaded {
-			_ = page.Timeout(30 * time.Second).Reload()
-			pageReloaded = true
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		time.Sleep(1 * time.Second)
-	}
-	if !loaded {
-		saveErrorScreenshot(page, accountID, "login_form_missing")
-		return fmt.Errorf("timed out waiting for GFX login form")
-	}
-	if alreadyLoggedIn {
-		return nil
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	log.Printf("[gfx_%s] Filling credentials...", slot.Account.WebsiteID)
+	u := safeURL()
+	if u != "" && !strings.Contains(u, "signin") {
+		log.Printf("[gfx_%s] Already logged in", slot.Account.WebsiteID)
+		return page, nil
+	}
+
+	log.Printf("[gfx_%s] Logging in...", slot.Account.WebsiteID)
 	stopWatch, loginAPI := watchGFXLoginAPI(page)
 	defer stopWatch()
 
@@ -107,7 +96,7 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 		return true;
 	}`, username, password)
 	if err != nil {
-		return fmt.Errorf("failed to fill credentials: %w", err)
+		return nil, fmt.Errorf("failed to fill credentials: %w", err)
 	}
 
 	_, _ = page.Eval(`() => {
@@ -118,9 +107,9 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 
 	isRedirected := false
 	showDeviceLimit := false
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 30; i++ {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
 		urlNow := safeURL()
 		if urlNow != "" && !strings.Contains(urlNow, "signin") {
@@ -135,7 +124,7 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 			showDeviceLimit = true
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	if showDeviceLimit {
@@ -145,25 +134,36 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 			if (btn) { btn.click(); return true; }
 			return false;
 		}`)
-		for k := 0; k < 20; k++ {
+		for k := 0; k < 15; k++ {
 			if u := safeURL(); u != "" && !strings.Contains(u, "signin") {
 				isRedirected = true
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 		}
 		if !isRedirected {
 			saveErrorScreenshot(page, accountID, "device_limit")
-			return fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, "device limit — Sign In Again did not work"))
+			return nil, fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, "device limit — Sign In Again did not work"))
 		}
 	}
 
 	if !isRedirected {
-		time.Sleep(2 * time.Second) // allow auth/login response body
+		time.Sleep(1 * time.Second)
 		pageErr := readPageLoginError(page)
 		saveErrorScreenshot(page, accountID, "signin_failed")
-		return fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, pageErr))
+		return nil, fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, pageErr))
 	}
+
+	if startURL != "" && !strings.Contains(safeURL(), "/tools/") {
+		_ = page.Timeout(30 * time.Second).Navigate(startURL)
+		for i := 0; i < 15; i++ {
+			if strings.Contains(safeURL(), "/tools/") || !strings.Contains(safeURL(), "signin") {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+
 	log.Printf("[gfx_%s] Login successful", slot.Account.WebsiteID)
-	return nil
+	return page, nil
 }

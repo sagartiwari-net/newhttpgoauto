@@ -26,4 +26,5 @@ type ToolDef struct {
 	CaptureLocalStorage bool
 	CaptureIndexedDB    bool
 	UseLSPayloadFormat  bool
+	SkipPageReload      bool // fast path: capture LS/cookies without reload (e.g. Airbrush)
 }

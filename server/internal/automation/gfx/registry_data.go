@@ -12,10 +12,11 @@ func initRegistry() {
 		WebsiteID: "airbrush",
 		BackupFile: "gfx_airbrush_cookies.json",
 		Referer: "https://airbrush.ai/",
-		SessionCookieNames: nil,
+		SessionCookieNames: []string{"loginSet"},
 		CaptureLocalStorage: true,
-		CaptureIndexedDB: true,
+		CaptureIndexedDB: false,
 		UseLSPayloadFormat: false,
+		SkipPageReload: true,
 	},
 	"gfx_runAnswerthepublic": {
 		TaskUID: "gfx_runAnswerthepublic", Kind: KindExtension,
