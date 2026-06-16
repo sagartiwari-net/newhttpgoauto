@@ -4,9 +4,19 @@ set -e
 
 REPO_URL="https://github.com/sagartiwari-net/newhttpgoauto.git"
 INSTALL_DIR="${HOME}/newhttpgoauto"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# If run from /tmp (curl download), clone repo first so helper scripts are available
+if [ ! -f "$SCRIPT_DIR/install-go-mac.sh" ]; then
+  echo "==> [0/4] Cloning repository (helper scripts not found locally)..."
+  if [ ! -d "$INSTALL_DIR/.git" ]; then
+    git clone "$REPO_URL" "$INSTALL_DIR"
+  fi
+  SCRIPT_DIR="$INSTALL_DIR/deploy"
+fi
 
 echo "==> [1/4] Installing Go..."
-bash "$(dirname "$0")/install-go-mac.sh"
+bash "$SCRIPT_DIR/install-go-mac.sh"
 export PATH="$HOME/.local/go/bin:$PATH"
 
 if [ ! -d "$INSTALL_DIR/.git" ]; then
