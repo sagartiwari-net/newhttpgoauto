@@ -23,7 +23,10 @@ const (
 	sessionWebsiteID   = "markhorseotool"
 )
 
-var semrushLinkRE = regexp.MustCompile(`(?i)href=["']([^"']*sm01\.markhorseotool\.com[^"']*)["']`)
+var (
+	semrushLinkRE = regexp.MustCompile(`(?i)href=["']([^"']*sm01\.markhorseotool\.com[^"']*)["']`)
+	csrfTokenRE   = regexp.MustCompile(`(?i)name=["']csrf_token["'][^>]*value=["']([^"']+)["']`)
+)
 
 // refsPortalCookie matches JSON format expected by markhor.php.
 type refsPortalCookie struct {
@@ -66,11 +69,17 @@ func RunSemrush() (string, string) {
 	}
 
 	if !isLoggedIn(body, pageURL) {
-		if _, _, _, err := client.GET(loginURL, map[string]string{"Referer": memberURL}); err != nil {
+		loginBody, _, _, err := client.GET(loginURL, map[string]string{"Referer": memberURL})
+		if err != nil {
 			return "failed", "markhor login page error: " + err.Error()
+		}
+		csrfToken, err := parseCSRFToken(loginBody)
+		if err != nil {
+			return "failed", "markhor csrf_token missing: " + err.Error()
 		}
 
 		form := url.Values{}
+		form.Set("csrf_token", csrfToken)
 		form.Set("username", username)
 		form.Set("password", password)
 
@@ -172,6 +181,7 @@ func loginFailureReason(finalURL, body string, httpStatus int) string {
 	}
 	lower := strings.ToLower(body)
 	for _, phrase := range []string{
+		"invalid request",
 		"invalid credentials",
 		"incorrect username or password",
 		"authentication failed",
@@ -196,6 +206,15 @@ func findSemrushLink(html string) string {
 		return strings.TrimSpace(m[1])
 	}
 	return ""
+}
+
+func parseCSRFToken(html string) (string, error) {
+	if m := csrfTokenRE.FindStringSubmatch(html); len(m) > 1 {
+		if token := strings.TrimSpace(m[1]); token != "" {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("csrf_token not found in login page")
 }
 
 func collectPortalCookies(client *httpclient.Client) ([]refsPortalCookie, error) {
