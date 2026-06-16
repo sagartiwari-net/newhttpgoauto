@@ -24,39 +24,51 @@ const (
 )
 
 func ensureLoggedIn(ctx context.Context, s *Session, username, password string) error {
-	if s.LoggedIn() {
-		if isDashboard(s.Page()) {
+	page := s.Page()
+	shots := screenshotDir()
+
+	// Reused Chrome from prior task in same profile run — skip login if still authenticated.
+	if s.LoggedIn() || isAuthenticated(page) {
+		if isAuthenticated(page) {
+			log.Println("[SEOShope] Session still logged in — skipping login")
+			s.MarkLoggedIn()
 			return nil
 		}
 		s.logged = false
 	}
 
-	page := s.Page()
-	shots := screenshotDir()
-
-	if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
-		var params []*proto.NetworkCookieParam
-		if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {
-			_ = page.SetCookies(params)
-			log.Printf("[SEOShope] Restored %d saved portal cookies", len(params))
+	if !isAuthenticated(page) {
+		if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
+			var params []*proto.NetworkCookieParam
+			if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {
+				_ = page.SetCookies(params)
+				log.Printf("[SEOShope] Restored %d saved portal cookies", len(params))
+			}
 		}
 	}
 
-	_ = page.Timeout(30 * time.Second).Navigate(memberURL)
-	time.Sleep(2 * time.Second)
+	// Only navigate to member if we are not already on an authenticated page.
+	if !isAuthenticated(page) {
+		_ = page.Timeout(30 * time.Second).Navigate(memberURL)
+		time.Sleep(2 * time.Second)
+		waitForPageReady(page, shots, 30*time.Second)
+	}
 
-	if waitForPageReady(page, shots, 30*time.Second) && isDashboard(page) {
-		log.Println("[SEOShope] Already logged in via profile/session")
-		if hasMemberSessionCookie(page) {
-			s.MarkLoggedIn()
-			_ = savePortalCookies(ctx, page)
-			return nil
-		}
-		log.Println("[SEOShope] Stale session (only PHPSESSID) — clearing and re-login")
-		clearPortalSession(page)
+	if isAuthenticated(page) {
+		log.Println("[SEOShope] Already logged in — no login needed")
+		s.MarkLoggedIn()
+		_ = savePortalCookies(ctx, page)
+		return nil
 	}
 
 	if !isLoginPage(page) {
+		// Page may still be settling after redirect from a previous Semrush tab.
+		time.Sleep(2 * time.Second)
+		if isAuthenticated(page) {
+			log.Println("[SEOShope] Logged in after settle — skipping login")
+			s.MarkLoggedIn()
+			return nil
+		}
 		takeScreenshot(page, "unexpected_page_before_login", shots)
 		return fmt.Errorf("login page not found (url=%s)", pageURL(page))
 	}
@@ -118,7 +130,7 @@ func waitForPageReady(page *rod.Page, shots string, timeout time.Duration) bool 
 			time.Sleep(2 * time.Second)
 			continue
 		}
-		if isDashboard(page) || isLoginPage(page) {
+		if isAuthenticated(page) || isLoginPage(page) {
 			return true
 		}
 		time.Sleep(1 * time.Second)
@@ -130,7 +142,7 @@ func waitForPageReady(page *rod.Page, shots string, timeout time.Duration) bool 
 func waitForLoginSuccess(page *rod.Page, shots string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if isDashboard(page) && hasMemberSessionCookie(page) {
+		if isAuthenticated(page) && hasMemberSessionCookie(page) {
 			return nil
 		}
 		if msg := loginErrorMessage(page); msg != "" {
@@ -144,8 +156,31 @@ func waitForLoginSuccess(page *rod.Page, shots string, timeout time.Duration) er
 }
 
 func isDashboard(page *rod.Page) bool {
+	return isAuthenticated(page)
+}
+
+// isAuthenticated reports a logged-in member area (custom SEOShope theme or aMember).
+func isAuthenticated(page *rod.Page) bool {
+	if isLoginPage(page) {
+		return false
+	}
+	if hasMemberSessionCookie(page) {
+		return true
+	}
+	u := strings.ToLower(pageURL(page))
+	if strings.Contains(u, "/member") && !strings.Contains(u, "/login") {
+		if has, _, _ := page.Has("input[name='amember_login'], input[name='amember_pass']"); !has {
+			return true
+		}
+	}
+	if strings.Contains(u, "/page/sem") {
+		if has, _, _ := page.Has("button.semmy-btn"); has {
+			return true
+		}
+	}
 	selectors := []string{
 		"a[href*='logout']",
+		"a[href*='log-out']",
 		".am-user-info",
 		".am-member-layout",
 		".am-layout-content",
@@ -156,7 +191,17 @@ func isDashboard(page *rod.Page) bool {
 			return true
 		}
 	}
-	return hasMemberSessionCookie(page)
+	res, err := page.Eval(`() => {
+		if (document.querySelector('input[name="amember_login"]') ||
+			document.querySelector('input[name="amember_pass"]')) return false;
+		const text = document.body ? document.body.innerText : "";
+		if (/welcome\\s+/i.test(text)) return true;
+		if (/active subscription/i.test(text)) return true;
+		if (/your tools/i.test(text)) return true;
+		if (document.querySelector('[href*="logout"], [href*="log-out"]')) return true;
+		return false;
+	}`)
+	return err == nil && res.Value.Bool()
 }
 
 func isLoginPage(page *rod.Page) bool {
@@ -173,7 +218,7 @@ func isLoginPage(page *rod.Page) bool {
 }
 
 func hasMemberSessionCookie(page *rod.Page) bool {
-	cookies, err := page.Cookies([]string{"https://app.seoshope.com"})
+	cookies, err := page.Cookies([]string{})
 	if err != nil {
 		return false
 	}

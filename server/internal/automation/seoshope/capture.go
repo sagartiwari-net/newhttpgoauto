@@ -53,7 +53,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	}
 	time.Sleep(3 * time.Second)
 
-	if isLoginPage(page) || !hasMemberSessionCookie(page) {
+	if isLoginPage(page) {
 		takeScreenshot(page, "sem_page_not_logged_in", shots)
 		s.logged = false
 		return "failed", "not logged in on /page/sem — login or Turnstile failed"
