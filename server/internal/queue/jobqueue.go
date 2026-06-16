@@ -177,11 +177,15 @@ func pollOnce() {
 			return
 		}
 		log.Printf("▶️ [WORKER] Claimed job #%d: %s (by %s)", id, taskUID, triggeredBy)
-		if !RunSync(taskUID, triggeredBy) {
-			log.Printf("⚠️ [WORKER] %s already running — job #%d marked failed", taskUID, id)
-			_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
-			return
-		}
-		_, _ = db.DB.Exec(`UPDATE job_queue SET status='done', finished_at=NOW() WHERE id=?`, id)
+		go runClaimedJob(id, taskUID, triggeredBy)
 	}
+}
+
+func runClaimedJob(id int, taskUID, triggeredBy string) {
+	if !RunSync(taskUID, triggeredBy) {
+		log.Printf("⚠️ [WORKER] %s already running — job #%d marked failed", taskUID, id)
+		_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
+		return
+	}
+	_, _ = db.DB.Exec(`UPDATE job_queue SET status='done', finished_at=NOW() WHERE id=?`, id)
 }

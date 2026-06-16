@@ -1,0 +1,1464 @@
+[
+  {
+    "uid": "gfx_oneclick_runVecteezy",
+    "kind": "oneclick",
+    "func": "Vecteezy",
+    "cfg": {
+      "ToolName": "Vecteezy",
+      "WebsiteID": "vecteezy"
+    }
+  },
+  {
+    "uid": "gfx_runAirbrush",
+    "kind": "extension",
+    "func": "Airbrush",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/airbrush-ai",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "airbrush",
+      "BackupFileName": "gfx_airbrush_cookies.json",
+      "Referer": "https://airbrush.ai/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runAnswerthepublic",
+    "kind": "extension",
+    "func": "Answerthepublic",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/answerthepublic",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "answerthepublic",
+      "BackupFileName": "gfx_answerthepublic_cookies.json",
+      "Referer": "https://answerthepublic.com/",
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runAvatarBuilder",
+    "kind": "extension",
+    "func": "Avatarbuilder",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/avatar-builder",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "avatarbuilder",
+      "BackupFileName": "gfx_avatarbuilder_cookies.json",
+      "Referer": "https://avatarbuilder.com/",
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runBlinkist",
+    "kind": "extension",
+    "func": "Blinkist",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/blinkist",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "blinkist",
+      "BackupFileName": "gfx_blinkist_cookies.json",
+      "Referer": "https://www.blinkist.com/",
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runCanva",
+    "kind": "extension",
+    "func": "Canva",
+    "cfg": {
+      "SpecificSelector": "button[data-tldr=\"canva77899\"]",
+      "FallbackIndex": 0,
+      "WebsiteID": "canva",
+      "BackupFileName": "gfx_canva_cookies.json",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/canva-pro",
+      "ToolName": "Canva Pro"
+    }
+  },
+  {
+    "uid": "gfx_runCanva2",
+    "kind": "extension",
+    "func": "Canva2",
+    "cfg": {
+      "SpecificSelector": "button[data-tldr=\"canva77900\"]",
+      "FallbackIndex": 1,
+      "WebsiteID": "canva_2",
+      "BackupFileName": "gfx_canva_2_cookies.json",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/canva-pro",
+      "ToolName": "Canva Pro"
+    }
+  },
+  {
+    "uid": "gfx_runCapcut",
+    "kind": "extension",
+    "func": "Capcut",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/capcut",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "capcut",
+      "BackupFileName": "gfx_capcut_cookies.json",
+      "Referer": "https://www.capcut.com/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runChatgpt",
+    "kind": "extension",
+    "func": "Chatgpt",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/chatgpt1",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "chatgpt",
+      "BackupFileName": "gfx_chatgpt_cookies.json",
+      "Referer": "https://chatgpt.com/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runClosercopy",
+    "kind": "extension",
+    "func": "Closercopy",
+    "cfg": {
+      "ToolName": "CloserCopy",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/closercopy",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "closercopy",
+      "BackupFileName": "gfx_closercopy_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runCodecademy",
+    "kind": "extension",
+    "func": "Codecademy",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/codecademy",
+      "WebsiteID": "codecademy",
+      "BackupFileName": "gfx_codecademy_cookies.json",
+      "Referer": "https://www.codecademy.com/catalog",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runCoursera",
+    "kind": "extension",
+    "func": "Coursera",
+    "cfg": {
+      "ToolName": "Coursera",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/coursera",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "coursera",
+      "BackupFileName": "gfx_coursera_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runCreativeFabrica",
+    "kind": "extension",
+    "func": "CreativeFabrica",
+    "cfg": {
+      "ToolName": "Creative Fabrica",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/creative-fabrica",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "creativefabrica",
+      "BackupFileName": "gfx_creativefabrica_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runCreatorai",
+    "kind": "extension",
+    "func": "Creatorai",
+    "cfg": {
+      "ToolName": "Creator AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/creator-ai",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "creatorai",
+      "BackupFileName": "gfx_creatorai_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runCreattie",
+    "kind": "extension",
+    "func": "Creattie",
+    "cfg": {
+      "ToolName": "Creattie",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/creattie-",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "creattie",
+      "BackupFileName": "gfx_creattie_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runEducative",
+    "kind": "extension",
+    "func": "Educative",
+    "cfg": {
+      "ToolName": "Educative",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/educative",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "educative",
+      "BackupFileName": "gfx_educative_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runEnvatoTuts",
+    "kind": "extension",
+    "func": "EnvatoTuts",
+    "cfg": {
+      "ToolName": "Envato Tuts+",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/envato-tuts",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].cookie-btn",
+      "WebsiteID": "envato_tuts",
+      "BackupFileName": "gfx_envato_tuts_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runEpidemic",
+    "kind": "extension",
+    "func": "EpidemicSoundsOne",
+    "cfg": {
+      "ToolName": "Epidemic Sounds 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/epidemicsounds",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779421133823_7331\"]",
+      "WebsiteID": "epidemicsounds",
+      "BackupFileName": "gfx_epidemicsounds_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runEpidemic2",
+    "kind": "extension",
+    "func": "EpidemicSoundsTwo",
+    "cfg": {
+      "ToolName": "Epidemic Sounds 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/epidemicsounds",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779421133728_9224\"]",
+      "WebsiteID": "epidemicsounds_2",
+      "BackupFileName": "gfx_epidemicsounds_2_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runEverland",
+    "kind": "extension",
+    "func": "Everland",
+    "cfg": {
+      "ToolName": "Everland",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/everland",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779422109125_911\"]",
+      "WebsiteID": "everland",
+      "BackupFileName": "gfx_everland_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runFlaticon",
+    "kind": "extension",
+    "func": "Flaticon",
+    "cfg": {
+      "ToolName": "Flaticon",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/flaticon",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779422308506_7481\"]",
+      "WebsiteID": "flaticon",
+      "BackupFileName": "gfx_flaticon_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runFomoclips",
+    "kind": "extension",
+    "func": "FomoClips",
+    "cfg": {
+      "ToolName": "FomoClips",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/fomoclips",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779423166656_822\"]",
+      "WebsiteID": "fomoclips",
+      "BackupFileName": "gfx_fomoclips_cookies.json",
+      "Referer": "https://app.fomoclips.com/app/dashboards/default",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "UseLocalStoragePayloadFormat": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runFrase",
+    "kind": "extension",
+    "func": "Frase",
+    "cfg": {
+      "ToolName": "Frase",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/frase-io",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779427385038_1502\"]",
+      "WebsiteID": "frase",
+      "BackupFileName": "gfx_frase_cookies.json",
+      "Referer": "https://app.frase.io/app/home",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "UseLocalStoragePayloadFormat": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runGlorify",
+    "kind": "extension",
+    "func": "Glorify",
+    "cfg": {
+      "ToolName": "Glorify",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/glorify",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779427732018_7939\"]",
+      "WebsiteID": "glorify",
+      "BackupFileName": "gfx_glorify_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runGptzero",
+    "kind": "extension",
+    "func": "Gptzero",
+    "cfg": {
+      "ToolName": "GPTZero",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/gptzero",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"].ls-btn",
+      "WebsiteID": "gptzero",
+      "BackupFileName": "gfx_gptzero_cookies.json",
+      "Referer": "https://gptzero.me/",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "UseLocalStoragePayloadFormat": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runGrammarly",
+    "kind": "extension",
+    "func": "Grammarly",
+    "cfg": {
+      "ToolName": "Grammarly",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/grammerly",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779428472534_6061\"]",
+      "WebsiteID": "grammarly",
+      "BackupFileName": "gfx_grammarly_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runGrok",
+    "kind": "extension",
+    "func": "GrokOne",
+    "cfg": {
+      "ToolName": "Grok 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/grok",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779429696437_1114\"]",
+      "WebsiteID": "grok",
+      "BackupFileName": "gfx_grok_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runGrok2",
+    "kind": "extension",
+    "func": "GrokTwo",
+    "cfg": {
+      "ToolName": "Grok 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/grok",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779429696832_151\"]",
+      "WebsiteID": "grok_2",
+      "BackupFileName": "gfx_grok_2_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runHelium10_01",
+    "kind": "extension",
+    "func": "Helium10_01",
+    "cfg": {
+      "ToolName": "Helium 10 Acc 01",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/helium-10",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779431201481_2839\"]",
+      "WebsiteID": "helium10_01",
+      "BackupFileName": "gfx_helium10_01_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runHelium10_02",
+    "kind": "extension",
+    "func": "Helium10_02",
+    "cfg": {
+      "ToolName": "Helium 10 Acc 02",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/helium-10",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779431201610_6890\"]",
+      "WebsiteID": "helium10_02",
+      "BackupFileName": "gfx_helium10_02_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runHixBypass",
+    "kind": "extension",
+    "func": "HixBypass",
+    "cfg": {
+      "ToolName": "Hix AI Bypass AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/hix-ai-bypass-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779441412510_9224\"]",
+      "WebsiteID": "hix_bypass",
+      "BackupFileName": "gfx_hix_bypass_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runHumanPal",
+    "kind": "extension",
+    "func": "HumanPal",
+    "cfg": {
+      "ToolName": "HumanPal",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/humanpal",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "humanpal",
+      "BackupFileName": "gfx_humanpal_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runIaskai",
+    "kind": "extension",
+    "func": "Iaskai",
+    "cfg": {
+      "ToolName": "I Ask AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/i-ask-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779442423733_8974\"]",
+      "WebsiteID": "iaskai",
+      "BackupFileName": "gfx_iaskai_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runInvideo",
+    "kind": "extension",
+    "func": "Invideo",
+    "cfg": {
+      "ToolName": "InVideo",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/invideo",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779443012010_688\"]",
+      "WebsiteID": "invideo",
+      "BackupFileName": "gfx_invideo_cookies.json",
+      "Referer": "https://studio.invideo.io/dashboard",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "UseLocalStoragePayloadFormat": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runJasper",
+    "kind": "extension",
+    "func": "Jasper",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/jasper-ai",
+      "BackupFileName": "gfx_jasper_cookies.json",
+      "WebsiteID": "jasper",
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runJungleScout",
+    "kind": "extension",
+    "func": "JungleScout",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/jungle-scout",
+      "WebsiteID": "junglescout",
+      "BackupFileName": "gfx_junglescout_cookies.json",
+      "Referer": "https://www.junglescout.com/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runKeywordtool",
+    "kind": "extension",
+    "func": "Keywordtool",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/keywordtool-io",
+      "WebsiteID": "keywordtool",
+      "BackupFileName": "gfx_keywordtool_cookies.json",
+      "Referer": "https://keywordtool.io/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runKittl",
+    "kind": "extension",
+    "func": "Kittl",
+    "cfg": {
+      "ToolName": "Kittl",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/kittl",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779446931237_6932\"]",
+      "WebsiteID": "kittl",
+      "BackupFileName": "gfx_kittl_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runKwfinder",
+    "kind": "extension",
+    "func": "Kwfinder",
+    "cfg": {
+      "ToolName": "KWFinder",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/kwfinder",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779447336734_3750\"]",
+      "WebsiteID": "kwfinder",
+      "BackupFileName": "gfx_kwfinder_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runLeonardo",
+    "kind": "extension",
+    "func": "Leonardo",
+    "cfg": {
+      "ToolName": "Leonardo AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/leonardo-ai",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "leonardo",
+      "BackupFileName": "gfx_leonardo_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runLinguix",
+    "kind": "extension",
+    "func": "Linguix",
+    "cfg": {
+      "ToolName": "Linguix",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/linguix",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779448191497_3515\"]",
+      "WebsiteID": "linguix",
+      "BackupFileName": "gfx_linguix_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runLinkedinLearning",
+    "kind": "extension",
+    "func": "LinkedinLearning",
+    "cfg": {
+      "ToolName": "LinkedIn Learning",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/linkedin-learning",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779449273720_9270\"]",
+      "WebsiteID": "linkedin-learning",
+      "BackupFileName": "gfx_linkedin_learning_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runLovepik",
+    "kind": "extension",
+    "func": "Lovepik",
+    "cfg": {
+      "ToolName": "Lovepik",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/lovepik",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779449645481_3729\"]",
+      "WebsiteID": "lovepik",
+      "BackupFileName": "gfx_lovepik_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runMajestic",
+    "kind": "extension",
+    "func": "Majestic",
+    "cfg": {
+      "ToolName": "Majestic",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/majestic",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779450200763_493\"]",
+      "WebsiteID": "majestic",
+      "BackupFileName": "gfx_majestic_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runMoz_01",
+    "kind": "extension",
+    "func": "MozPro01",
+    "cfg": {
+      "ToolName": "Moz Pro 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/moz-pro",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "mozpro1",
+      "BackupFileName": "gfx_mozpro1_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runMoz_02",
+    "kind": "extension",
+    "func": "MozPro02",
+    "cfg": {
+      "ToolName": "Moz Pro 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/moz-pro",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "mozpro2",
+      "BackupFileName": "gfx_mozpro2_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNetflix_01",
+    "kind": "extension",
+    "func": "Netflix01",
+    "cfg": {
+      "ToolName": "Netflix 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/netflix",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "netflix01",
+      "BackupFileName": "gfx_netflix01_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNetflix_02",
+    "kind": "extension",
+    "func": "Netflix02",
+    "cfg": {
+      "ToolName": "Netflix 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/netflix",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "netflix02",
+      "BackupFileName": "gfx_netflix02_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNeuronwriter_01",
+    "kind": "extension",
+    "func": "Neuronwriter01",
+    "cfg": {
+      "ToolName": "NeuronWriter 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/neuron-writer",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "neuronwriter_01",
+      "BackupFileName": "gfx_neuronwriter01_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNeuronwriter_02",
+    "kind": "extension",
+    "func": "Neuronwriter02",
+    "cfg": {
+      "ToolName": "NeuronWriter 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/neuron-writer",
+      "SpecificSelector": "button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "neuronwriter_02",
+      "BackupFileName": "gfx_neuronwriter02_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNichess",
+    "kind": "extension",
+    "func": "Nichess",
+    "cfg": {
+      "ToolName": "Nichess",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/nichess",
+      "SpecificSelector": "button.cookie-btn, button[data-tool-cookie=\"true\"]",
+      "WebsiteID": "nichess",
+      "BackupFileName": "gfx_nichess_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runNotegpt",
+    "kind": "extension",
+    "func": "Notegpt",
+    "cfg": {
+      "ToolName": "NoteGPT",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/notegpt",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779462838196_589\"]",
+      "WebsiteID": "notegpt",
+      "BackupFileName": "gfx_notegpt_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runOcoya",
+    "kind": "extension",
+    "func": "Ocoya",
+    "cfg": {
+      "ToolName": "Ocoya",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/ocoya",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779279926687_7171\"]",
+      "WebsiteID": "ocoya",
+      "BackupFileName": "gfx_ocoya_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPaperpal",
+    "kind": "extension",
+    "func": "Paperpal",
+    "cfg": {
+      "ToolName": "Paperpal",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/paperpal",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288602196_4372\"]",
+      "WebsiteID": "paperpal",
+      "BackupFileName": "gfx_paperpal_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPerplexity",
+    "kind": "extension",
+    "func": "Perplexity01",
+    "cfg": {
+      "ToolName": "Perplexity 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/perpexility-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779280714549_2054\"]",
+      "WebsiteID": "perplexity",
+      "BackupFileName": "gfx_perplexity_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPerplexity2",
+    "kind": "extension",
+    "func": "Perplexity02",
+    "cfg": {
+      "ToolName": "Perplexity 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/perpexility-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779280714661_9201\"]",
+      "WebsiteID": "perplexity_2",
+      "BackupFileName": "gfx_perplexity2_cookies.json",
+      "FallbackIndex": 1,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPikmonkey",
+    "kind": "extension",
+    "func": "Pikmonkey",
+    "cfg": {
+      "ToolName": "Pikmonkey",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/pikmonkey",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779290636119_2686\"]",
+      "WebsiteID": "pikmonkey",
+      "BackupFileName": "gfx_pikmonkey_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPlaceit",
+    "kind": "extension",
+    "func": "Placeit",
+    "cfg": {
+      "ToolName": "Placeit",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/place-it",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779274000957_4383\"]",
+      "WebsiteID": "placeit",
+      "BackupFileName": "gfx_placeit_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPrezi",
+    "kind": "extension",
+    "func": "Prezi",
+    "cfg": {
+      "ToolName": "Prezi AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/prezi-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779282298379_7730\"]",
+      "WebsiteID": "prezi",
+      "BackupFileName": "gfx_prezi_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runPrimeVideo",
+    "kind": "extension",
+    "func": "PrimeVideo",
+    "cfg": {
+      "ToolName": "Prime Video",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/prime-video",
+      "SpecificSelector": "button[data-tldr=\"primevideo\"]",
+      "WebsiteID": "primevideo",
+      "BackupFileName": "gfx_prime_video_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runRelume",
+    "kind": "extension",
+    "func": "Relume",
+    "cfg": {
+      "ToolName": "Relume",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/relume",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779279927282_4654\"]",
+      "WebsiteID": "relume",
+      "BackupFileName": "gfx_relume_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runRenderforest",
+    "kind": "extension",
+    "func": "Renderforest",
+    "cfg": {
+      "ToolName": "Renderforest",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/renderforest",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779282300144_8914\"]",
+      "WebsiteID": "renderforest",
+      "BackupFileName": "gfx_renderforest_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runRewritify",
+    "kind": "extension",
+    "func": "Rewritify",
+    "cfg": {
+      "ToolName": "Rewritify AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/rewritify-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779282299269_2958\"]",
+      "WebsiteID": "rewritify",
+      "BackupFileName": "gfx_rewritify_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runRivalflow",
+    "kind": "extension",
+    "func": "Rivalflow",
+    "cfg": {
+      "ToolName": "Rivalflow",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/rivalflow",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287636976_6664\"]",
+      "WebsiteID": "rivalflow",
+      "BackupFileName": "gfx_rivalflow_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runRytr",
+    "kind": "extension",
+    "func": "Rytr",
+    "cfg": {
+      "ToolName": "Rytr",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/rytr",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288601593_4672\"]",
+      "WebsiteID": "rytr",
+      "BackupFileName": "gfx_rytr_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runScite",
+    "kind": "extension",
+    "func": "Scite",
+    "cfg": {
+      "ToolName": "Scite AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/scite-ai",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287635649_4339\"]",
+      "WebsiteID": "scite",
+      "BackupFileName": "gfx_scite_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runScrepy",
+    "kind": "extension",
+    "func": "Screpy",
+    "cfg": {
+      "ToolName": "Screpy",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/screpy",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287635216_8811\"]",
+      "WebsiteID": "screpy",
+      "BackupFileName": "gfx_screpy_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runScribd",
+    "kind": "extension",
+    "func": "Scribd",
+    "cfg": {
+      "ToolName": "Scribd",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/scribd",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779289986261_6218\"]",
+      "WebsiteID": "scribd",
+      "BackupFileName": "gfx_scribd_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSellTheTrend",
+    "kind": "extension",
+    "func": "SellTheTrend",
+    "cfg": {
+      "ToolName": "Sell The Trend",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/sell-the-trend",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779290636026_2355\"]",
+      "WebsiteID": "sell_the_trend",
+      "BackupFileName": "gfx_sellthetrend_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSemrush",
+    "kind": "extension",
+    "func": "SemrushExt",
+    "cfg": {
+      "ToolName": "Semrush GFX",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/semrush",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779283061835_4523\"]",
+      "WebsiteID": "semrush",
+      "BackupFileName": "gfx_semrush_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSeositecheckup",
+    "kind": "extension",
+    "func": "Seositecheckup",
+    "cfg": {
+      "ToolName": "SEOSiteCheckup",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/seositecheckup",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287627697_24\"]",
+      "WebsiteID": "seositecheckup",
+      "BackupFileName": "gfx_seositecheckup_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSeotesteronline",
+    "kind": "extension",
+    "func": "Seotesteronline",
+    "cfg": {
+      "ToolName": "SEO Tester Online",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/seotester-online",
+      "SpecificSelector": "[data-tool-id=\"tool_1779287634968_161\"]",
+      "WebsiteID": "seotesteronline",
+      "BackupFileName": "gfx_seotesteronline_cookies.json",
+      "Referer": "https://suite.seotesteronline.com/",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": false,
+      "UseLocalStoragePayloadFormat": true,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSerpstat",
+    "kind": "extension",
+    "func": "Serpstat",
+    "cfg": {
+      "ToolName": "Serpstat",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/serpstat",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287630736_3407\"]",
+      "WebsiteID": "serpstat",
+      "BackupFileName": "gfx_serpstat_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runShortform",
+    "kind": "extension",
+    "func": "Shortform",
+    "cfg": {
+      "ToolURL": "https://app.gfxtoolz.ai/tools/shortform",
+      "WebsiteID": "shortform",
+      "BackupFileName": "gfx_shortform_cookies.json",
+      "Referer": "https://www.shortform.com/",
+      "CaptureLocalStorage": true,
+      "CaptureIndexedDB": true
+    }
+  },
+  {
+    "uid": "gfx_runSimilarweb",
+    "kind": "extension",
+    "func": "Similarweb",
+    "cfg": {
+      "ToolName": "Similarweb",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/similarweb",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287630433_6767\"]",
+      "WebsiteID": "similarweb",
+      "BackupFileName": "gfx_similarweb_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSkillshare",
+    "kind": "extension",
+    "func": "Skillshare",
+    "cfg": {
+      "ToolName": "Skillshare",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/skillshare",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288599037_1975\"]",
+      "WebsiteID": "skillshare",
+      "BackupFileName": "gfx_skillshare_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSlideshare",
+    "kind": "extension",
+    "func": "Slideshare",
+    "cfg": {
+      "ToolName": "Slideshare",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/slideshare",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779289986077_516\"]",
+      "WebsiteID": "slideshare",
+      "BackupFileName": "gfx_slideshare_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSpamzilla",
+    "kind": "extension",
+    "func": "Spamzilla",
+    "cfg": {
+      "ToolName": "Spamzilla",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/spamzilla",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779283064169_7229\"]",
+      "WebsiteID": "spamzilla",
+      "BackupFileName": "gfx_spamzilla_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSpyfu",
+    "kind": "extension",
+    "func": "Spyfu",
+    "cfg": {
+      "ToolName": "Spyfu",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/spyfu",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779283065848_8433\"]",
+      "WebsiteID": "spyfu",
+      "BackupFileName": "gfx_spyfu_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runStorybase",
+    "kind": "extension",
+    "func": "Storybase",
+    "cfg": {
+      "ToolName": "Storybase",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/storybase",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287637219_901\"]",
+      "WebsiteID": "storybase",
+      "BackupFileName": "gfx_storybase_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runSubmagic",
+    "kind": "extension",
+    "func": "Submagic",
+    "cfg": {
+      "ToolName": "Submagic",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/submagic-io",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779283061547_8158\"]",
+      "WebsiteID": "submagic",
+      "BackupFileName": "gfx_submagic_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUbersuggest_01",
+    "kind": "extension",
+    "func": "Ubersuggest_01",
+    "cfg": {
+      "ToolName": "Ubersuggest Account 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/ubersuggest",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287633914_6009\"]",
+      "WebsiteID": "ubersuggest_01",
+      "BackupFileName": "gfx_ubersuggest_01_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUbersuggest_02",
+    "kind": "extension",
+    "func": "Ubersuggest_02",
+    "cfg": {
+      "ToolName": "Ubersuggest Account 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/ubersuggest",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779287786512_210\"]",
+      "WebsiteID": "ubersuggest_02",
+      "BackupFileName": "gfx_ubersuggest_02_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUdemy_01",
+    "kind": "extension",
+    "func": "Udemy_01",
+    "cfg": {
+      "ToolName": "Udemy Account 1",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/udemy",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288594241_8361\"]",
+      "WebsiteID": "udemy_01",
+      "BackupFileName": "gfx_udemy_01_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUdemy_02",
+    "kind": "extension",
+    "func": "Udemy_02",
+    "cfg": {
+      "ToolName": "Udemy Account 2",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/udemy",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288595513_346\"]",
+      "WebsiteID": "udemy_02",
+      "BackupFileName": "gfx_udemy_02_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUdemy_03",
+    "kind": "extension",
+    "func": "Udemy_03",
+    "cfg": {
+      "ToolName": "Udemy Account 3",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/udemy",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779288597413_689\"]",
+      "WebsiteID": "udemy_03",
+      "BackupFileName": "gfx_udemy_03_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_runUizard",
+    "kind": "extension",
+    "func": "Uizard",
+    "cfg": {
+      "ToolName": "Uizard Pro",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/uizard-pro",
+      "SpecificSelector": "button[data-tool-id=\"tool_1779279927386_2733\"]",
+      "WebsiteID": "uizard",
+      "BackupFileName": "gfx_uizard_cookies.json",
+      "FallbackIndex": 0,
+      "CaptureLocalStorage": false,
+      "CaptureIndexedDB": false,
+      "SessionCookieNames": []
+    }
+  },
+  {
+    "uid": "gfx_scrapeArtislyAI",
+    "kind": "cred_fetch",
+    "func": "ArtislyAI",
+    "cfg": {
+      "ToolName": "Artisly Ai",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/artisly-ai"
+    }
+  },
+  {
+    "uid": "gfx_scrapeArtspaceAI",
+    "kind": "cred_fetch",
+    "func": "ArtspaceAI",
+    "cfg": {
+      "ToolName": "Artspace Ai",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/artspace-ai"
+    }
+  },
+  {
+    "uid": "gfx_scrapeBuzzsumo",
+    "kind": "cred_fetch",
+    "func": "Buzzsumo",
+    "cfg": {
+      "ToolName": "Buzzsumo",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/buzzsumo"
+    }
+  },
+  {
+    "uid": "gfx_scrapeCramly",
+    "kind": "cred_fetch",
+    "func": "CramlyAI",
+    "cfg": {
+      "ToolName": "Cramly AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/cramly-ai"
+    }
+  },
+  {
+    "uid": "gfx_scrapeCrazyeggs",
+    "kind": "cred_fetch",
+    "func": "Crazyeggs",
+    "cfg": {
+      "ToolName": "Crazyeggs",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/crazyeggs"
+    }
+  },
+  {
+    "uid": "gfx_scrapeCreatopy",
+    "kind": "cred_fetch",
+    "func": "Creatopy",
+    "cfg": {
+      "ToolName": "Creatopy",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/creatopy-plus"
+    }
+  },
+  {
+    "uid": "gfx_scrapeDesignbeast",
+    "kind": "cred_fetch",
+    "func": "Designbeast",
+    "cfg": {
+      "ToolName": "Designbest",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/designbeast"
+    }
+  },
+  {
+    "uid": "gfx_scrapeGptzero",
+    "kind": "cred_fetch",
+    "func": "Gptzero",
+    "cfg": {
+      "ToolName": "Gptzero",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/gptzero"
+    }
+  },
+  {
+    "uid": "gfx_scrapeKatalistAI",
+    "kind": "cred_fetch",
+    "func": "KatalistAI",
+    "cfg": {
+      "ToolName": "Katalist Ai",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/katalist-ai"
+    }
+  },
+  {
+    "uid": "gfx_scrapePodcastleAI",
+    "kind": "cred_fetch",
+    "func": "PodcastleAI",
+    "cfg": {
+      "ToolName": "Podcastle Ai",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/podcastle-ai"
+    }
+  },
+  {
+    "uid": "gfx_scrapeSlidebeans",
+    "kind": "cred_fetch",
+    "func": "Slidebeans",
+    "cfg": {
+      "ToolName": "Slidebeans",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/slidebeans"
+    }
+  },
+  {
+    "uid": "gfx_scrapeToonsAI",
+    "kind": "cred_fetch",
+    "func": "ToonsAI",
+    "cfg": {
+      "ToolName": "Toons AI",
+      "ToolURL": "https://app.gfxtoolz.ai/tools/toons-ai"
+    }
+  }
+]

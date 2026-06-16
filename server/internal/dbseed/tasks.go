@@ -33,9 +33,11 @@ var DefaultTasks = []TaskDef{
 
 // EnsureTasks inserts missing tasks; existing rows are left unchanged.
 func EnsureTasks() {
+	all := append([]TaskDef{}, DefaultTasks...)
+	all = append(all, GFXTasks...)
 	log.Println("🌱 [DB] Syncing built-in tasks...")
 	var inserted int
-	for _, t := range DefaultTasks {
+	for _, t := range all {
 		var exists bool
 		if err := db.DB.QueryRow(
 			`SELECT EXISTS(SELECT 1 FROM tasks WHERE task_uid=?)`, t.UID,

@@ -1,0 +1,82 @@
+{
+  "name": "GFXToolz",
+  "description": "Click. Access. Create. - Premium tools for designers and creators",
+  "version": "9.0.1",
+  "manifest_version": 3,
+  "icons": {
+    "128": "./src/icon.png"
+  },
+  "action": {
+    "default_popup": "./src/popup.html"
+  },
+  "background": {
+    "service_worker": "./src/x7k9m2.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/*"
+      ],
+      "js": [
+        "./src/q9r4t7.js",
+        "./src/m8s3l5.js"
+      ],
+      "run": "document_start"
+    },
+    {
+      "matches": [
+        "*://*/*"
+      ],
+      "js": [
+        "./src/p5h8w3.js",
+        "./src/n2v6k1.js"
+      ],
+      "run": "document_end"
+    }
+  ],
+  "permissions": [
+    "tabs",
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "windows",
+    "activeTab",
+    "cookies",
+    "management",
+    "browsingData",
+    "proxy",
+    "webRequest",
+    "webRequestAuthProvider",
+    "webNavigation",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "declarativeNetRequestFeedback",
+    "scripting",
+    "notifications"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "crypto-js.min.js",
+        "gfxtoolz.js",
+        "src/gfxtoolz2.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "incognito": "split"
+}

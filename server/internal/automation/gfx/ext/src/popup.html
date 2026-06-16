@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GFXToolz Extension</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 380px;
+            height: 500px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            position: relative;
+        }
+
+        .popup-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 5px;
+            overflow: hidden;
+            background:
+                linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%),
+                url('Popup-1.webp');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .popup-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.2);
+            z-index: 1;
+        }
+
+        .container {
+            padding: 40px 24px 24px 24px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 2;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .welcome-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .title {
+            color: white;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        .features {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .feature {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature:hover {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(15px);
+            transform: translateY(-2px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .feature-icon svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .icon-tools {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 50%, #0288d1 100%);
+            box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+        }
+
+        .icon-security {
+            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 50%, #388e3c 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .icon-status {
+            background: linear-gradient(135deg, #e91e63 0%, #f06292 50%, #c2185b 100%);
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+        }
+
+        .feature-content h3 {
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .feature-content p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .get-started-btn {
+            width: 100%;
+            background: #2c2c2c;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .get-started-btn:hover {
+            background: #1a1a1a;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="popup-wrapper">
+        <div class="container">
+            <div class="header">
+                <div class="welcome-text">The AI Era of GFXToolz</div>
+                <h1 class="title">GFXToolz v9.0.1</h1>
+            </div>
+
+            <div class="features">
+                <div class="feature" data-action="tools">
+                    <div class="feature-icon icon-tools">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="7" height="7" x="3" y="3" rx="1" />
+                            <rect width="7" height="7" x="14" y="3" rx="1" />
+                            <rect width="7" height="7" x="14" y="14" rx="1" />
+                            <rect width="7" height="7" x="3" y="14" rx="1" />
+                        </svg>
+                    </div>
+                    <div class="feature-content">
+                        <h3>Premium Tool Access</h3>
+                        <p>Access 100+ professional tools with just a few clicks.</p>
+                    </div>
+                </div>
+
+                <div class="feature" data-action="security">
+                    <div class="feature-icon icon-security">
+                        <svg fill="#fff" height="20" viewBox="0 0 1069 1069"
+                            style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+                            version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg"
+                            xmlns:serif="http://www.serif.com/" xmlns:xlink="http://www.w3.org/1999/xlink">
+
+                            <rect height="1066.67" id="Headset" style="fill:none;" width="1066.67" x="1.411"
+                                y="1.589" />
+
+                            <g>
+
+                                <path
+                                    d="M863.764,641.673c0,-25.549 -10.149,-50.052 -28.215,-68.118c-18.066,-18.066 -42.569,-28.216 -68.118,-28.216l-0.108,0c-25.549,0 -50.052,10.15 -68.118,28.216c-18.066,18.066 -28.215,42.569 -28.215,68.118c-0,43.071 -0,99.334 -0,142.404c-0,25.549 10.149,50.052 28.215,68.118c18.066,18.066 42.569,28.216 68.118,28.216l0.108,-0c25.549,-0 50.052,-10.15 68.118,-28.216c18.066,-18.066 28.215,-42.569 28.215,-68.118l-0,-142.404Zm-465.265,0c0.001,-25.549 -10.149,-50.052 -28.215,-68.118c-18.066,-18.066 -42.568,-28.216 -68.118,-28.216l-0.108,0c-25.549,0 -50.052,10.15 -68.118,28.216c-18.066,18.066 -28.215,42.569 -28.215,68.118c0,43.071 0,99.334 0,142.404c0,25.549 10.149,50.052 28.215,68.118c18.066,18.066 42.569,28.216 68.118,28.216l0.108,-0c25.55,-0 50.052,-10.15 68.118,-28.216c18.066,-18.066 28.216,-42.569 28.215,-68.118l0,-142.404Zm402.765,-0l-0,142.404c-0,8.973 -3.565,17.579 -9.91,23.924c-6.344,6.345 -14.949,9.909 -23.922,9.91c-0.003,-0 -0.109,-0 -0.109,-0c-8.974,-0.001 -17.579,-3.565 -23.924,-9.91c-6.345,-6.345 -9.909,-14.951 -9.909,-23.924l-0,-142.404c-0,-8.973 3.564,-17.579 9.909,-23.924c6.345,-6.345 14.95,-9.909 23.923,-9.91c0.003,0 0.108,0 0.108,0c8.975,0.001 17.58,3.565 23.924,9.91c6.345,6.345 9.91,14.951 9.91,23.924Zm-465.265,-0l0,142.404c0,8.973 -3.564,17.579 -9.909,23.924c-6.345,6.345 -14.95,9.909 -23.922,9.91c-0.004,-0 -0.109,-0 -0.109,-0c-8.975,-0.001 -17.58,-3.565 -23.924,-9.91c-6.345,-6.345 -9.91,-14.951 -9.91,-23.924l0,-142.404c0,-8.973 3.565,-17.579 9.91,-23.924c6.344,-6.345 14.949,-9.909 23.922,-9.91c0.004,0 0.109,0 0.109,0c8.974,0.001 17.579,3.565 23.924,9.91c6.345,6.345 9.909,14.951 9.909,23.924Z"
+                                    style="fill-opacity:0.5;" />
+
+                                <path
+                                    d="M946.603,714.727l-0,-221.472c-0.001,-201.353 -163.23,-364.582 -364.584,-364.582c-31.371,-0 -63.178,-0 -94.549,-0c-201.354,-0 -364.583,163.229 -364.583,364.582c-0,117.75 -0,221.472 -0,221.472c-0,17.248 14.002,31.25 31.25,31.25c17.247,0 31.25,-14.002 31.25,-31.25l-0,-221.47c0.001,-166.838 135.248,-302.084 302.083,-302.084c31.371,-0 63.178,-0 94.549,-0c166.836,-0 302.082,135.246 302.084,302.081c-0,0.003 -0,221.473 -0,221.473c-0,17.248 14.002,31.25 31.25,31.25c17.247,0 31.25,-14.002 31.25,-31.25Zm-504.911,-430.501l167.495,-0c17.247,-0 31.25,-14.003 31.25,-31.25c-0,-17.248 -14.003,-31.25 -31.25,-31.25l-167.495,-0c-17.248,-0 -31.25,14.002 -31.25,31.25c-0,17.247 14.002,31.25 31.25,31.25Z" />
+
+                            </g>
+
+                        </svg>
+                    </div>
+                    <div class="feature-content">
+                        <h3>24x7 Support</h3>
+                        <p>Live chat, WhatsApp, and remote desktop support provided.</p>
+                    </div>
+                </div>
+
+                <div class="feature" data-action="status">
+                    <div class="feature-icon icon-status">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                            <path d="m9 12 2 2 4-4" />
+                        </svg>
+                    </div>
+                    <div class="feature-content">
+                        <h3>Daily Monitoring & Checks</h3>
+                        <p>We ensure 99% uptime with continuous monitoring.</p>
+                    </div>
+                </div>
+            </div>
+
+            <button class="get-started-btn" id="accessToolsBtn">Access Premium Tools</button>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

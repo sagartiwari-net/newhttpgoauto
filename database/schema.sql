@@ -51,12 +51,16 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   INDEX `idx_tasks_next_run` (`next_run_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ─── Portal credentials (read by automation engine) ────────────────────────
+-- GFX account pool columns (also in migrations/003_credentials_pool.sql)
+-- pool_group='gfxtoolz' + pool_role='default' → session tools (hash-balanced)
+-- pool_role='scraper' → cred-fetch tools only (website_id e.g. gfxtoolz_scraper)
 CREATE TABLE IF NOT EXISTS `credentials` (
   `website_id`    VARCHAR(100) NOT NULL PRIMARY KEY,
   `label`         VARCHAR(150) DEFAULT NULL,
   `username`      VARCHAR(255) NOT NULL,
   `password_enc`  TEXT NOT NULL,
+  `pool_group`    VARCHAR(50) DEFAULT NULL COMMENT 'GFX pool: gfxtoolz',
+  `pool_role`     ENUM('default','scraper') NOT NULL DEFAULT 'default',
   `is_enabled`    TINYINT(1) NOT NULL DEFAULT 1,
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP

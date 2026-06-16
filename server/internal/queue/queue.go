@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gohttpauto/internal/automation/azad"
+	"gohttpauto/internal/automation/gfx"
 	"gohttpauto/internal/automation/markhor"
 	"gohttpauto/internal/automation/nox"
 	"gohttpauto/internal/automation/seoshope"
@@ -122,6 +123,9 @@ func Execute(taskUID, automationType string) (status, msg string) {
 	default:
 		if seoshope.IsSeoshopeTask(taskUID) {
 			return seoshope.Run(taskUID)
+		}
+		if gfx.IsGFXTask(taskUID) {
+			return gfx.Run(taskUID)
 		}
 		return "failed", "automation not implemented yet: " + taskUID
 	}
