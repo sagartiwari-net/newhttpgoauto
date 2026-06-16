@@ -21,7 +21,7 @@ func Run(taskUID string) (status, msg string) {
 	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 	defer cancel()
 
-	slot, err := ResolveSlot(ctx, taskUID, tool.Kind)
+	slot, err := ResolveSlot(ctx, taskUID)
 	if err != nil {
 		return "failed", err.Error()
 	}

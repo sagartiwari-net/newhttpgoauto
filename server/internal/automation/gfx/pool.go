@@ -11,12 +11,11 @@ import (
 	"gohttpauto/internal/db"
 )
 
-// Account is one enabled GFX portal credential from the pool.
+// Account is one enabled GFX portal credential from the shared pool.
 type Account struct {
 	WebsiteID string
 	Username  string
 	Password  string
-	Role      string // default | scraper
 }
 
 // Slot binds a task to one pool account and its Chrome profile directory.
@@ -25,11 +24,7 @@ type Slot struct {
 	ProfileDir string
 }
 
-const (
-	poolGroupDefault = "gfxtoolz"
-	roleDefault      = "default"
-	roleScraper      = "scraper"
-)
+const poolGroupDefault = "gfxtoolz"
 
 var profileLocks sync.Map // websiteID -> *sync.Mutex
 
@@ -39,29 +34,26 @@ func ProfileLock(websiteID string) *sync.Mutex {
 	return v.(*sync.Mutex)
 }
 
-// LoadAccounts returns enabled GFX credentials for the given role.
-func LoadAccounts(ctx context.Context, role string) ([]Account, error) {
+// LoadPoolAccounts returns all enabled GFX portal accounts (extension + cred-fetch share this pool).
+func LoadPoolAccounts(ctx context.Context) ([]Account, error) {
 	rows, err := db.DB.QueryContext(ctx, `
-		SELECT website_id, username, password_enc,
-		       COALESCE(pool_role, CASE WHEN website_id = 'gfxtoolz_scraper' THEN 'scraper' ELSE 'default' END)
+		SELECT website_id, username, password_enc
 		FROM credentials
 		WHERE is_enabled = 1
 		  AND (
 		    pool_group = ?
 		    OR (pool_group IS NULL AND website_id LIKE 'gfxtoolz%')
 		  )
-		  AND COALESCE(pool_role, CASE WHEN website_id = 'gfxtoolz_scraper' THEN 'scraper' ELSE 'default' END) = ?
-		ORDER BY website_id`, poolGroupDefault, role)
+		ORDER BY website_id`, poolGroupDefault)
 	if err != nil {
-		// Fallback when migration not applied yet.
-		return loadAccountsLegacy(ctx, role)
+		return loadAccountsLegacy(ctx)
 	}
 	defer rows.Close()
 
 	var list []Account
 	for rows.Next() {
 		var a Account
-		if err := rows.Scan(&a.WebsiteID, &a.Username, &a.Password, &a.Role); err != nil {
+		if err := rows.Scan(&a.WebsiteID, &a.Username, &a.Password); err != nil {
 			return nil, err
 		}
 		list = append(list, a)
@@ -69,13 +61,12 @@ func LoadAccounts(ctx context.Context, role string) ([]Account, error) {
 	return list, rows.Err()
 }
 
-func loadAccountsLegacy(ctx context.Context, role string) ([]Account, error) {
-	q := `
+func loadAccountsLegacy(ctx context.Context) ([]Account, error) {
+	rows, err := db.DB.QueryContext(ctx, `
 		SELECT website_id, username, password_enc
 		FROM credentials
 		WHERE is_enabled = 1 AND website_id LIKE 'gfxtoolz%'
-		ORDER BY website_id`
-	rows, err := db.DB.QueryContext(ctx, q)
+		ORDER BY website_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -87,37 +78,20 @@ func loadAccountsLegacy(ctx context.Context, role string) ([]Account, error) {
 		if err := rows.Scan(&a.WebsiteID, &a.Username, &a.Password); err != nil {
 			return nil, err
 		}
-		if role == roleScraper {
-			if a.WebsiteID == "gfxtoolz_scraper" || a.WebsiteID == "gfxtoolz_2" {
-				a.Role = roleScraper
-				list = append(list, a)
-			}
-			continue
-		}
-		if a.WebsiteID == "gfxtoolz_scraper" {
-			continue
-		}
-		a.Role = roleDefault
 		list = append(list, a)
 	}
 	return list, rows.Err()
 }
 
-// ResolveSlot picks an account for a task using stable hash partitioning.
-func ResolveSlot(ctx context.Context, taskUID string, kind Kind) (Slot, error) {
-	role := roleDefault
-	if kind == KindCredFetch {
-		role = roleScraper
-	}
-	accounts, err := LoadAccounts(ctx, role)
+// ResolveSlot picks an account for any GFX task (extension, cred-fetch, future one-click)
+// using stable hash partitioning across the shared pool.
+func ResolveSlot(ctx context.Context, taskUID string) (Slot, error) {
+	accounts, err := LoadPoolAccounts(ctx)
 	if err != nil {
 		return Slot{}, err
 	}
 	if len(accounts) == 0 {
-		if kind == KindCredFetch {
-			return Slot{}, fmt.Errorf("no enabled GFX scraper account (set pool_role=scraper or website_id=gfxtoolz_scraper)")
-		}
-		return Slot{}, fmt.Errorf("no enabled GFX accounts in pool")
+		return Slot{}, fmt.Errorf("no enabled GFX accounts (add gfxtoolz_1, gfxtoolz_2, … in credentials)")
 	}
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(taskUID))
