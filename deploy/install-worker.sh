@@ -12,7 +12,7 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-go build -o gohttpauto ./cmd
+go build -buildvcs=false -o gohttpauto ./cmd
 echo "==> Worker built. Start with:"
 echo "    cd $APP_DIR/server && ./gohttpauto"
 echo "    (Keep SSH tunnel open if using DB_PORT=3307)"
