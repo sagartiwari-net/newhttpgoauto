@@ -16,7 +16,10 @@ import (
 	"gohttpauto/internal/db"
 )
 
-const refsUploadURL = "https://refs.1clkaccess.store/tbsm1.php"
+const (
+	refsUploadURL    = "https://refs.1clkaccess.store/tbsm1.php"
+	portalCookieDomain = ".toolbaazar.com"
+)
 
 var semrushLinkRE = regexp.MustCompile(`(?i)href=["']([^"']*(?:semrush4\.toolbaazar\.com|toolbaazar\.com)[^"']*)["']`)
 
@@ -51,7 +54,7 @@ func RunSemrush() (string, string) {
 	portalBase := "https://app.toolbaazar.com/"
 
 	if saved, err := cookiesession.Load(ctx, portalSessionID); err == nil && len(saved) > 0 {
-		_ = client.SetCookies(portalBase, cookiesession.ToHTTPCookies(saved))
+		_ = client.SetCookies(portalBase, portalSessionToHTTP(saved))
 		log.Printf("[Toolbaazar] restored %d portal cookies", len(saved))
 	}
 
@@ -96,6 +99,9 @@ func RunSemrush() (string, string) {
 	}
 	if len(portalCookies) == 0 {
 		return "failed", "no aMember portal cookies captured (PHPSESSID/amember_nr)"
+	}
+	if !hasRequiredPortalCookies(portalCookies) {
+		return "failed", "missing PHPSESSID or amember_nr after login"
 	}
 
 	if err := savePortalSession(ctx, portalCookies, portalSessionID, portalBase); err != nil {
@@ -142,58 +148,89 @@ func findSemrushLink(html string) string {
 }
 
 func collectPortalCookies(client *httpclient.Client) ([]refsPortalCookie, error) {
+	// Prefer response Set-Cookie values (latest login), then jar state.
+	byName := map[string]*http.Cookie{}
+	for _, c := range client.Captured {
+		if c == nil || !isPortalCookie(strings.ToLower(c.Name)) {
+			continue
+		}
+		byName[c.Name] = c
+	}
 	raw, err := client.CookiesFor("https://app.toolbaazar.com/")
 	if err != nil {
 		return nil, err
 	}
-
-	seen := map[string]bool{}
-	var out []refsPortalCookie
 	for _, c := range raw {
-		if c == nil || c.Name == "" {
+		if c == nil || !isPortalCookie(strings.ToLower(c.Name)) {
 			continue
 		}
-		nameLower := strings.ToLower(c.Name)
-		if !isPortalCookie(nameLower) {
-			continue
-		}
+		byName[c.Name] = c // jar state wins (latest session after login)
+	}
 
-		key := c.Name + "|" + c.Value
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-
-		domain := c.Domain
-		if domain == "" {
-			domain = ".toolbaazar.com"
-		}
-		if !strings.HasPrefix(domain, ".") {
-			domain = "." + strings.TrimPrefix(domain, ".")
-		}
-
+	var out []refsPortalCookie
+	for _, c := range byName {
 		path := c.Path
 		if path == "" {
 			path = "/"
 		}
-
 		expires := float64(-1)
 		if !c.Expires.IsZero() && c.Expires.Unix() > 0 {
 			expires = float64(c.Expires.Unix())
 		}
-
 		out = append(out, refsPortalCookie{
 			Name:     c.Name,
 			Value:    c.Value,
-			Domain:   domain,
+			Domain:   portalCookieDomain,
 			Path:     path,
 			Expires:  expires,
 			Size:     len(c.Name) + len(c.Value),
-			HttpOnly: c.HttpOnly,
-			Secure:   c.Secure,
+			HttpOnly: true,
+			Secure:   true,
 		})
 	}
 	return out, nil
+}
+
+func hasRequiredPortalCookies(cookies []refsPortalCookie) bool {
+	hasSession := false
+	hasMember := false
+	for _, c := range cookies {
+		switch strings.ToLower(c.Name) {
+		case "phpsessid":
+			hasSession = c.Value != ""
+		default:
+			if strings.HasPrefix(strings.ToLower(c.Name), "amember") && c.Value != "" {
+				hasMember = true
+			}
+		}
+	}
+	return hasSession && hasMember
+}
+
+func portalSessionToHTTP(saved []cookiesession.Cookie) []*http.Cookie {
+	out := make([]*http.Cookie, 0, len(saved))
+	for _, c := range saved {
+		if strings.TrimSpace(c.Name) == "" {
+			continue
+		}
+		path := c.Path
+		if path == "" {
+			path = "/"
+		}
+		h := &http.Cookie{
+			Name:     c.Name,
+			Value:    c.Value,
+			Domain:   portalCookieDomain,
+			Path:     path,
+			Secure:   true,
+			HttpOnly: true,
+		}
+		if c.ExpirationDate > 0 {
+			h.Expires = time.Unix(int64(c.ExpirationDate), 0)
+		}
+		out = append(out, h)
+	}
+	return out
 }
 
 func isPortalCookie(name string) bool {
