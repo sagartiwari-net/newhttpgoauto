@@ -1,0 +1,16 @@
+[Unit]
+Description=GoHttpAuto Panel API + Dashboard
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/panel.1clkaccess.store/server
+EnvironmentFile=/www/wwwroot/panel.1clkaccess.store/server/.env
+ExecStart=/www/wwwroot/panel.1clkaccess.store/server/gohttpauto
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

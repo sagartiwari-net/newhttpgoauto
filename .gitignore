@@ -1,0 +1,22 @@
+# Secrets
+server/.env
+.env
+*.pem
+
+# Go
+server/gohttpauto
+server/gohttpauto.exe
+*.test
+
+# Node
+dashboard/node_modules/
+dashboard/dist/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
