@@ -24,7 +24,6 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 		log.Printf("[GFX] profile meta warning (%s): %v", slot.Account.WebsiteID, err)
 	}
 	_ = os.MkdirAll(slot.ProfileDir, 0755)
-	_ = os.MkdirAll(screenshotDir(), 0755)
 	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
 		_ = os.Remove(filepath.Join(slot.ProfileDir, lf))
 	}

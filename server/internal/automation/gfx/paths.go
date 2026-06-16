@@ -32,10 +32,6 @@ func profileDirForAccount(websiteID string) string {
 	return filepath.Join(dataRoot(), "profiles", "gfx", websiteID)
 }
 
-func screenshotDir() string {
-	return filepath.Join(dataRoot(), "screenshots", "gfx")
-}
-
 func cookiesBackupDir() string {
 	return filepath.Join(dataRoot(), "cookies")
 }

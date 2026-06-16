@@ -24,7 +24,6 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 
 	page := session.newPage()
 	dataDir := dataRoot()
-	shotDir := screenshotDir()
 	browser := session.Browser()
 
 	// Access Tool Page
@@ -110,7 +109,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	}
 
 	if !btnFound {
-		takeScreenshot(page, "error_no_access_btn_"+tool.WebsiteID, shotDir)
+		saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
 		// Dump buttons info to debug
 		resDebug, errDebug := page.Eval(`() => {
 			const btns = Array.from(document.querySelectorAll('button'));
@@ -159,7 +158,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 		return fmt.Errorf("failed to click access button: %w", err)
 	}
 	if !resClick.Value.Bool() {
-		takeScreenshot(page, "error_click_failed_"+tool.WebsiteID, shotDir)
+		saveErrorScreenshot(page, tool.WebsiteID, "click_failed")
 		return fmt.Errorf("SSO Access button click failed (selector: %s, fallback: %v)", btnSelectorClicked, useFallback)
 	}
 
@@ -201,15 +200,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 	log.Printf("[gfx_%s] Root domain for cookies: %s", tool.WebsiteID, rootDomain)
 
 	// Attempt Cloudflare bypass if challenge is detected on target page
-	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain, shotDir)
+	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
 
 	// Settle wait of 5 seconds (after potential CF bypass)
 	log.Printf("[gfx_%s] Settle wait of 5 seconds...", tool.WebsiteID)
 	time.Sleep(5 * time.Second)
-
-	// Screenshot to verify the final state of the target page
-	log.Printf("[gfx_%s] Taking post-click settle screenshot...", tool.WebsiteID)
-	takeScreenshot(newPage, "after_click_"+tool.WebsiteID, shotDir)
 
 	// Intercept request cookies via CDP
 	_ = proto.NetworkEnable{}.Call(newPage)
@@ -297,9 +292,6 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 
 	log.Printf("[gfx_%s] Waiting 12 seconds for page to fully settle (JS-set cookies)...", tool.WebsiteID)
 	time.Sleep(12 * time.Second)
-
-	log.Printf("[gfx_%s] Taking screenshot of the accessed tool page...", tool.WebsiteID)
-	takeScreenshot(newPage, "success_access_"+tool.WebsiteID, shotDir)
 
 	// Fetch all cookies from standard jar
 	log.Printf("[gfx_%s] Fetching cookie jar...", tool.WebsiteID)
@@ -519,7 +511,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef) error {
 //	3. Block CF challenge scripts via request hijacking + inject fake cf_clearance + reload
 //
 // This is called right after the GFX extension opens the tool's website in a new tab.
-func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, rootDomain, screenshotDir string) {
+func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, rootDomain string) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -553,7 +545,6 @@ func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, 
 	}
 
 	log.Printf("[gfx_%s] 🛡️ Cloudflare challenge detected on %s. Initiating bypass sequence...", websiteID, rootDomain)
-	takeScreenshot(page, "cf_detected_"+websiteID, screenshotDir)
 
 	// ── Strategy 1: Wait for CF Managed Challenge to auto-resolve (max 30s) ──────
 	log.Printf("[gfx_%s] [CF] Waiting up to 30s for CF Managed Challenge to auto-resolve...", websiteID)
@@ -618,10 +609,7 @@ func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, 
 	// Final result check
 	if isCFChallenge() {
 		log.Printf("[gfx_%s] [CF] ⚠️ Cloudflare still present after all bypass attempts. Cookie capture may be incomplete.", websiteID)
-		takeScreenshot(page, "cf_bypass_failed_"+websiteID, screenshotDir)
-	} else {
-		log.Printf("[gfx_%s] [CF] ✅ Cloudflare bypass successful!", websiteID)
-		takeScreenshot(page, "cf_bypass_ok_"+websiteID, screenshotDir)
+		saveErrorScreenshot(page, websiteID, "cf_bypass_failed")
 	}
 }
 

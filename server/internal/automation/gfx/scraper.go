@@ -15,7 +15,6 @@ import (
 func runCredScraper(ctx context.Context, session *Session, tool ToolDef) error {
 	log.Printf("[GFX] Cred scrape %s (%s)", tool.ScrapeName, tool.ToolURL)
 	page := session.newPage()
-	shotDir := screenshotDir()
 
 	if err := ensureGFXLogin(ctx, session); err != nil {
 		return err
@@ -41,7 +40,7 @@ func runCredScraper(ctx context.Context, session *Session, tool ToolDef) error {
 		time.Sleep(1 * time.Second)
 	}
 	if !buttonsLoaded {
-		takeScreenshot(page, "error_buttons_not_loaded_"+tool.ScrapeName, shotDir)
+		log.Println("[GFX] Credentials buttons did not appear within 20s — continuing...")
 	}
 
 	_, _ = page.Eval(`() => {
@@ -68,7 +67,11 @@ func runCredScraper(ctx context.Context, session *Session, tool ToolDef) error {
 	targetURLVal := scrapeOpenURL(page)
 
 	if usernameVal == "" || passwordVal == "" {
-		takeScreenshot(page, "error_scrape_failed_"+toolName, shotDir)
+		group := tool.WebsiteID
+		if group == "" {
+			group = tool.TaskUID
+		}
+		saveErrorScreenshot(page, group, "scrape_failed")
 		return fmt.Errorf("failed to extract credentials for %s", toolName)
 	}
 

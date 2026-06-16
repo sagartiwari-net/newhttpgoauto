@@ -13,7 +13,7 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 	slot := session.Slot()
 	username := slot.Account.Username
 	password := slot.Account.Password
-	shotDir := screenshotDir()
+	accountID := slot.Account.WebsiteID
 
 	safeURL := func() string {
 		if ctx.Err() != nil {
@@ -44,7 +44,6 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 		return ctx.Err()
 	}
 	time.Sleep(3 * time.Second)
-	takeScreenshot(page, "debug_navigation_immediate_"+slot.Account.WebsiteID, shotDir)
 
 	alreadyLoggedIn := false
 	if u := safeURL(); u != "" && !strings.Contains(u, "signin") {
@@ -85,7 +84,7 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 		time.Sleep(1 * time.Second)
 	}
 	if !loaded {
-		takeScreenshot(page, "error_login_form_missing_"+slot.Account.WebsiteID, shotDir)
+		saveErrorScreenshot(page, accountID, "login_form_missing")
 		return fmt.Errorf("timed out waiting for GFX login form")
 	}
 	if alreadyLoggedIn {
@@ -138,7 +137,6 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 
 	if showDeviceLimit {
 		log.Printf("[gfx_%s] Device limit modal — clicking Sign In Again", slot.Account.WebsiteID)
-		takeScreenshot(page, "debug_device_limit_"+slot.Account.WebsiteID, shotDir)
 		_, _ = page.Eval(`() => {
 			const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Sign In Again'));
 			if (btn) { btn.click(); return true; }
@@ -154,7 +152,7 @@ func ensureGFXLogin(ctx context.Context, session *Session) error {
 	}
 
 	if !isRedirected {
-		takeScreenshot(page, "error_signin_failed_"+slot.Account.WebsiteID, shotDir)
+		saveErrorScreenshot(page, accountID, "signin_failed")
 		return fmt.Errorf("GFX sign-in failed (still on signin page)")
 	}
 	log.Printf("[gfx_%s] Login successful", slot.Account.WebsiteID)

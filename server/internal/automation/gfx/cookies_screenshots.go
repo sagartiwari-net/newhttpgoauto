@@ -3,8 +3,6 @@ package gfx
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -252,18 +250,4 @@ func solveCloudflare(page *rod.Page) bool {
 	log.Println("[CF] Click performed. Waiting for page reaction...")
 	time.Sleep(5 * time.Second)
 	return true
-}
-
-// takeScreenshot saves a debug screenshot in case of failure
-func takeScreenshot(page *rod.Page, label string, dir string) {
-	_ = os.MkdirAll(dir, 0755)
-	fp := filepath.Join(dir, fmt.Sprintf("%s_%d.png", label, time.Now().Unix()))
-	log.Printf("📸 [gfx_keywordtool] Taking screenshot for %s...", label)
-	imgBytes, err := page.Timeout(15 * time.Second).Screenshot(false, nil)
-	if err == nil {
-		_ = os.WriteFile(fp, imgBytes, 0644)
-		log.Printf("📸 [gfx_keywordtool] Debug screenshot saved: %s", fp)
-		return
-	}
-	log.Printf("⚠️ [gfx_keywordtool] Failed to save debug screenshot for %s: %v", label, err)
 }
