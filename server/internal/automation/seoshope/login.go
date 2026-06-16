@@ -27,13 +27,6 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 	page := s.EnsurePortalPage()
 	shots := screenshotDir()
 
-	// Prior task in same Chrome run — trust session flag + browser cookies, not stale page DOM.
-	if s.LoggedIn() || s.HasMemberCookies() {
-		log.Println("[SEOShope] Reusing logged-in Chrome session — skip login")
-		s.MarkLoggedIn()
-		return nil
-	}
-
 	if cBytes, err := os.ReadFile(loginCookieFile()); err == nil {
 		var params []*proto.NetworkCookieParam
 		if json.Unmarshal(cBytes, &params) == nil && len(params) > 0 {

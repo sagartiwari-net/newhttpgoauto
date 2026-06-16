@@ -68,7 +68,7 @@ func (s *Session) Close() {
 	if s == nil {
 		return
 	}
-	log.Println("[SEOShope] Closing Chrome (no more queued tasks for this profile)")
+	log.Println("[SEOShope] Closing Chrome (task finished)")
 	if s.browser != nil {
 		_ = s.browser.Close()
 	}
