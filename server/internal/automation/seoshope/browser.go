@@ -41,9 +41,11 @@ func newSession(ctx context.Context) (*Session, error) {
 		Set("disable-setuid-sandbox").
 		Set("disable-dev-shm-usage").
 		Set("disable-blink-features", "AutomationControlled").
+		Set("blink-settings", "imagesEnabled=false").
+		Set("disable-remote-fonts").
 		Set("mute-audio").
 		Set("disable-popup-blocking").
-		Set("window-size", "1920,1080").
+		Set("window-size", "1280,800").
 		UserDataDir(pDir)
 
 	u, err := l.Launch()
@@ -55,7 +57,7 @@ func newSession(ctx context.Context) (*Session, error) {
 	browser := rod.New().ControlURL(u).MustConnect().Context(sessCtx)
 
 	page := stealth.MustPage(browser)
-	page.MustSetViewport(1920, 1080, 1, false)
+	page.MustSetViewport(1280, 800, 1, false)
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 	})
@@ -124,7 +126,7 @@ func (s *Session) EnsurePortalPage() *rod.Page {
 
 	log.Println("[SEOShope] Opening new portal tab")
 	s.page = stealth.MustPage(s.browser)
-	s.page.MustSetViewport(1920, 1080, 1, false)
+	s.page.MustSetViewport(1280, 800, 1, false)
 	s.page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 	})

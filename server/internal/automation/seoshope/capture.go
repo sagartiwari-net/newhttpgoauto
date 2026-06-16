@@ -51,7 +51,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	if err := page.Timeout(30*time.Second).Navigate(semPageURL); err != nil {
 		return "failed", "sem page navigation failed: " + err.Error()
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	if isLoginPage(page) {
 		takeScreenshot(page, "sem_page_not_logged_in", shots)
@@ -86,6 +86,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 	wait()
 
 	newPage := s.Browser().MustPageFromTargetID(targetID)
+	setupPageNetwork(newPage)
 	defer func() {
 		_ = newPage.Close()
 		s.CloseExtraTabs()
@@ -109,7 +110,7 @@ func runSemrushSlot(ctx context.Context, s *Session, slot Slot) (string, string)
 		}
 	}
 	log.Printf("[SEOShope] target domain: %s", targetDomain)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	raw, err := newPage.Cookies([]string{})
 	if err != nil {

@@ -12,26 +12,9 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
-// attachTurnstileHijack matches goauto: mock Turnstile API + block other CF requests.
-// Must be called before navigating to the login page.
+// attachTurnstileHijack is kept as alias for setupPageNetwork.
 func attachTurnstileHijack(page *rod.Page) {
-	log.Println("[SEOShope] Injecting Cloudflare Turnstile hijacker (goauto style)")
-	router := page.HijackRequests()
-	router.MustAdd("*challenges.cloudflare.com/turnstile/v0/api.js*", func(ctx *rod.Hijack) {
-		log.Println("[SEOShope] Intercepted Turnstile API — serving mock")
-		ctx.Response.SetBody(turnstileMockJS)
-		ctx.Response.Headers().Set("Content-Type", "application/javascript")
-	})
-	router.MustAdd("*challenges.cloudflare.com*", func(ctx *rod.Hijack) {
-		log.Println("[SEOShope] Blocked Cloudflare challenge resource")
-		ctx.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
-	})
-	// Site-level CF challenge scripts (seen in ONF captures for app.seoshope.com)
-	router.MustAdd("*app.seoshope.com/cdn-cgi/challenge-platform/*", func(ctx *rod.Hijack) {
-		log.Println("[SEOShope] Blocked site challenge-platform resource")
-		ctx.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
-	})
-	go router.Run()
+	setupPageNetwork(page)
 }
 
 const turnstileMockJS = `
