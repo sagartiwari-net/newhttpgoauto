@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"gohttpauto/internal/automation/httpclient"
+	"gohttpauto/internal/automation/portalchrome"
 	"gohttpauto/internal/cookiesession"
 	"gohttpauto/internal/db"
 )
 
 var semrushLinkRE = regexp.MustCompile(`(?i)href=["']([^"']*(?:semrush2\.(?:azadseo\.com|xemrush\.click)|xemrush\.click)[^"']*)["']`)
 
-// RunSemrush logs into Azad members portal and captures Semrush proxy cookies.
+// RunSemrush logs into Azad via Chrome (Cloudflare-safe) and captures Semrush cookies over HTTP.
 func RunSemrush() (string, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	var username, password string
@@ -32,45 +33,18 @@ func RunSemrush() (string, string) {
 
 	client := httpclient.New(60 * time.Second)
 	memberURL := "https://members.azadseo.com/member"
-	loginURL := "https://members.azadseo.com/login"
 	portalSessionID := "azadseo_login"
 
-	if saved, err := cookiesession.Load(ctx, portalSessionID); err == nil && len(saved) > 0 {
-		_ = client.SetCookies("https://members.azadseo.com/", cookiesession.ToHTTPCookies(saved))
-		log.Printf("[Azad] restored %d portal cookies", len(saved))
-	}
-
-	body, status, _, err := client.GET(memberURL, nil)
-	if err != nil || status != 200 {
-		return "failed", fmt.Sprintf("member page error: %v (status %d)", err, status)
-	}
-
-	needsLogin := strings.Contains(strings.ToLower(body), `name="amember_login"`) ||
-		strings.Contains(strings.ToLower(body), `id="amember-login"`)
-
-	if needsLogin {
-		form := url.Values{}
-		form.Set("amember_login", username)
-		form.Set("amember_pass", password)
-		form.Set("remember_login", "1")
-
-		finalURL, postBody, postStatus, err := client.POST(loginURL, form.Encode(), map[string]string{
-			"Content-Type": "application/x-www-form-urlencoded",
-			"Origin":       "https://members.azadseo.com",
-			"Referer":      memberURL,
-		})
-		if err != nil {
-			return "failed", "azadseo login POST error: " + err.Error()
-		}
-		if !httpclient.LoginOK(finalURL, postBody) {
-			reason := httpclient.LoginFailureReason(finalURL, postBody, postStatus)
-			return "failed", "azadseo login failed: " + reason
-		}
-		log.Printf("[Azad] login OK → %s", finalURL)
-	}
-
-	if err := savePortalSession(ctx, client, portalSessionID, "https://members.azadseo.com/"); err != nil {
-		log.Printf("⚠️ [Azad] portal cookie save failed: %v", err)
+	if err := portalchrome.EnsureSession(ctx, client, username, password, portalchrome.SessionConfig{
+		Tag:             "[Azad]",
+		Profile:         "azadseo",
+		MemberURL:       memberURL,
+		CookieURL:       "https://members.azadseo.com/",
+		DomainFilter:    "azadseo.com",
+		PortalSessionID: portalSessionID,
+		VisibleEnv:      "AZAD_VISIBLE",
+	}); err != nil {
+		return "failed", "azadseo portal login failed: " + err.Error()
 	}
 
 	dashBody, _, _, err := client.GET(memberURL, map[string]string{
@@ -78,6 +52,9 @@ func RunSemrush() (string, string) {
 	})
 	if err != nil {
 		return "failed", "dashboard load error: " + err.Error()
+	}
+	if httpclient.IsCloudflareChallenge(dashBody) {
+		return "failed", "dashboard blocked by Cloudflare after login"
 	}
 
 	btn := findSemrushLink(dashBody)
@@ -116,33 +93,7 @@ func RunSemrush() (string, string) {
 	}
 
 	go uploadCookies(netscape)
-	return "success", fmt.Sprintf("HTTP automation complete — %d cookies captured", len(cookies))
-}
-
-func savePortalSession(ctx context.Context, client *httpclient.Client, websiteID, referer string) error {
-	raw, err := client.CookiesFor(referer)
-	if err != nil {
-		return err
-	}
-	cookies := make([]cookiesession.Cookie, 0, len(raw))
-	for _, c := range raw {
-		if c == nil || c.Name == "" {
-			continue
-		}
-		exp := c.Expires
-		if exp.IsZero() {
-			exp = time.Now().Add(24 * time.Hour)
-		}
-		cookies = append(cookies, cookiesession.SimpleCookie(c.Domain, c.Name, c.Value, c.Secure, c.HttpOnly, exp))
-	}
-	if len(cookies) == 0 {
-		return nil
-	}
-	return cookiesession.Save(ctx, cookiesession.SaveOptions{
-		WebsiteID: websiteID,
-		Referer:   referer,
-		Cookies:   cookies,
-	})
+	return "success", fmt.Sprintf("Chrome login + HTTP capture — %d cookies updated", len(cookies))
 }
 
 func findSemrushLink(html string) string {

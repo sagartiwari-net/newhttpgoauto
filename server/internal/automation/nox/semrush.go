@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"gohttpauto/internal/automation/httpclient"
+	"gohttpauto/internal/automation/portalchrome"
 	"gohttpauto/internal/cookiesession"
 	"gohttpauto/internal/db"
 )
 
 var semrushBtnRE = regexp.MustCompile(`(?i)href=["']([^"']*semrush\.noxtools\.com/server1\.php[^"']*)["']`)
 
-// RunSemrush logs into NoxTools and captures Semrush proxy_token cookie.
+// RunSemrush logs into NoxTools via Chrome (Cloudflare-safe) and captures Semrush cookies over HTTP.
 func RunSemrush() (string, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	var email, password string
@@ -32,51 +33,25 @@ func RunSemrush() (string, string) {
 
 	client := httpclient.New(60 * time.Second)
 	portalSessionID := "noxtools_login"
-	if saved, err := cookiesession.Load(ctx, portalSessionID); err == nil && len(saved) > 0 {
-		_ = client.SetCookies("https://noxtools.com/", cookiesession.ToHTTPCookies(saved))
-		log.Printf("[Nox] restored %d portal cookies", len(saved))
-	}
-
-	loginURL := "https://noxtools.com/secure/login"
-	body, status, _, err := client.GET(loginURL, nil)
-	if err != nil || status != 200 {
-		return "failed", fmt.Sprintf("login page error: %v", err)
-	}
-
-	needsLogin := strings.Contains(strings.ToLower(body), `name="amember_login"`) ||
-		strings.Contains(strings.ToLower(body), `id="amember-login"`)
-	if needsLogin {
-		attemptID, err := httpclient.ParseAttemptID(body)
-		if err != nil {
-			return "failed", err.Error()
-		}
-
-		form := url.Values{}
-		form.Set("amember_login", email)
-		form.Set("amember_pass", password)
-		form.Set("login_attempt_id", attemptID)
-		form.Set("_referer", "https://noxtools.com/")
-		finalURL, postBody, postStatus, err := client.POST(loginURL, form.Encode(), map[string]string{
-			"Content-Type": "application/x-www-form-urlencoded",
-			"Origin":       "https://noxtools.com",
-			"Referer":      loginURL,
-		})
-		if err != nil {
-			return "failed", "noxtools login POST error: " + err.Error()
-		}
-		if !noxLoginOK(finalURL, postBody) {
-			reason := httpclient.LoginFailureReason(finalURL, postBody, postStatus)
-			return "failed", "noxtools login failed: " + reason
-		}
-	}
-	if err := savePortalSession(ctx, client, portalSessionID, "https://noxtools.com/"); err != nil {
-		log.Printf("⚠️ [Nox] portal cookie save failed: %v", err)
+	if err := portalchrome.EnsureSession(ctx, client, email, password, portalchrome.SessionConfig{
+		Tag:             "[Nox]",
+		Profile:         "noxtools",
+		MemberURL:       "https://noxtools.com/secure/member",
+		CookieURL:       "https://noxtools.com/",
+		DomainFilter:    "noxtools.com",
+		PortalSessionID: portalSessionID,
+		VisibleEnv:      "NOX_VISIBLE",
+	}); err != nil {
+		return "failed", "noxtools portal login failed: " + err.Error()
 	}
 
 	semPage := "https://noxtools.com/secure/page/semrush"
 	semBody, _, _, err := client.GET(semPage, map[string]string{"Referer": "https://noxtools.com/secure/secure/yourwallet"})
 	if err != nil {
 		return "failed", "semrush page error"
+	}
+	if httpclient.IsCloudflareChallenge(semBody) {
+		return "failed", "semrush page blocked by Cloudflare after login"
 	}
 	btn := findSemrushBtn(semBody)
 	if btn == "" {
@@ -117,15 +92,7 @@ func RunSemrush() (string, string) {
 	}
 
 	go uploadCookies(netscape)
-	return "success", "HTTP automation complete — proxy_token captured"
-}
-
-func noxLoginOK(finalURL, body string) bool {
-	if !httpclient.LoginOK(finalURL, body) {
-		return false
-	}
-	return !strings.Contains(strings.ToLower(body), `name="amember_login"`) ||
-		!strings.HasSuffix(strings.ToLower(finalURL), "/secure/login")
+	return "success", "Chrome login + HTTP capture — proxy_token updated"
 }
 
 func extractProxyToken(jar http.CookieJar, captured []*http.Cookie) string {
@@ -163,30 +130,4 @@ func uploadCookies(netscape string) {
 		return
 	}
 	resp.Body.Close()
-}
-
-func savePortalSession(ctx context.Context, client *httpclient.Client, websiteID, referer string) error {
-	raw, err := client.CookiesFor(referer)
-	if err != nil {
-		return err
-	}
-	cookies := make([]cookiesession.Cookie, 0, len(raw))
-	for _, c := range raw {
-		if c == nil || c.Name == "" {
-			continue
-		}
-		exp := c.Expires
-		if exp.IsZero() {
-			exp = time.Now().Add(24 * time.Hour)
-		}
-		cookies = append(cookies, cookiesession.SimpleCookie(c.Domain, c.Name, c.Value, c.Secure, c.HttpOnly, exp))
-	}
-	if len(cookies) == 0 {
-		return nil
-	}
-	return cookiesession.Save(ctx, cookiesession.SaveOptions{
-		WebsiteID: websiteID,
-		Referer:   referer,
-		Cookies:   cookies,
-	})
 }
