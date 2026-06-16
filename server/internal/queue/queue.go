@@ -8,6 +8,7 @@ import (
 	"gohttpauto/internal/automation/azad"
 	"gohttpauto/internal/automation/markhor"
 	"gohttpauto/internal/automation/nox"
+	"gohttpauto/internal/automation/seoshope"
 	"gohttpauto/internal/automation/toolbaazar"
 	"gohttpauto/internal/db"
 )
@@ -119,6 +120,9 @@ func Execute(taskUID, automationType string) (status, msg string) {
 	case "markho_runMarkhoSemrush":
 		return markhor.RunSemrush()
 	default:
+		if seoshope.IsSeoshopeTask(taskUID) {
+			return seoshope.Run(taskUID)
+		}
 		return "failed", "automation not implemented yet: " + taskUID
 	}
 }

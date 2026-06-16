@@ -21,6 +21,14 @@ var DefaultTasks = []TaskDef{
 	{UID: "azad_runAzadSemrush", Name: "Semrush (Azad)", Group: "azad", AutomationType: "http", IntervalMin: 60},
 	{UID: "toolbaazar_runToolbaazarSemrush", Name: "Semrush (Toolbaazar)", Group: "toolbaazar", AutomationType: "http", IntervalMin: 60},
 	{UID: "markho_runMarkhoSemrush", Name: "Semrush (Markhor)", Group: "markhor", AutomationType: "http", IntervalMin: 60},
+	{UID: "seoshope_runSemrush", Name: "Semrush (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush2", Name: "Semrush 2 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush3", Name: "Semrush 3 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush4", Name: "Semrush 4 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush5", Name: "Semrush 5 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush6", Name: "Semrush 6 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSemrush7", Name: "Semrush 7 (SEOShope)", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
+	{UID: "seoshope_runSeoshopehome", Name: "SEOShope Portal Login", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
 }
 
 // EnsureTasks inserts missing tasks; existing rows are left unchanged.
