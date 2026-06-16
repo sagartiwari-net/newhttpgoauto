@@ -22,7 +22,9 @@ if ! command -v go >/dev/null 2>&1; then
   bash ../deploy/install-go.sh
   export PATH=$PATH:/usr/local/go/bin
 fi
-go build -o gohttpauto ./cmd
+go build -buildvcs=false -o gohttpauto ./cmd
+chmod +x gohttpauto
+chown www:www gohttpauto .env 2>/dev/null || true
 cd ..
 
 echo "==> Installing systemd service..."
