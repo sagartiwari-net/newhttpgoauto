@@ -56,9 +56,9 @@ func newSession(ctx context.Context) (*Session, error) {
 	page := stealth.MustPage(browser)
 	page.MustSetViewport(1920, 1080, 1, false)
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
-		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 	})
-	attachTurnstileIfNeeded(page)
+	attachTurnstileHijack(page)
 
 	return &Session{browser: browser, page: page, cancel: cancel}, nil
 }

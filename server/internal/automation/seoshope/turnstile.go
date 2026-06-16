@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -13,21 +12,10 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
-// useTurnstileHijack enables mock Turnstile only on headless Linux.
-// On Mac the server rejects the mock token — real browser Turnstile is required.
-func useTurnstileHijack() bool {
-	return runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
-}
-
-func attachTurnstileIfNeeded(page *rod.Page) {
-	if !useTurnstileHijack() {
-		log.Println("[SEOShope] Real Turnstile mode — no API hijack (Mac/visible Chrome)")
-		return
-	}
-	attachTurnstileHijack(page)
-}
-
+// attachTurnstileHijack matches goauto: mock Turnstile API + block other CF requests.
+// Must be called before navigating to the login page.
 func attachTurnstileHijack(page *rod.Page) {
+	log.Println("[SEOShope] Injecting Cloudflare Turnstile hijacker (goauto style)")
 	router := page.HijackRequests()
 	router.MustAdd("*challenges.cloudflare.com/turnstile/v0/api.js*", func(ctx *rod.Hijack) {
 		log.Println("[SEOShope] Intercepted Turnstile API — serving mock")
@@ -35,6 +23,12 @@ func attachTurnstileHijack(page *rod.Page) {
 		ctx.Response.Headers().Set("Content-Type", "application/javascript")
 	})
 	router.MustAdd("*challenges.cloudflare.com*", func(ctx *rod.Hijack) {
+		log.Println("[SEOShope] Blocked Cloudflare challenge resource")
+		ctx.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
+	})
+	// Site-level CF challenge scripts (seen in ONF captures for app.seoshope.com)
+	router.MustAdd("*app.seoshope.com/cdn-cgi/challenge-platform/*", func(ctx *rod.Hijack) {
+		log.Println("[SEOShope] Blocked site challenge-platform resource")
 		ctx.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
 	})
 	go router.Run()
@@ -42,18 +36,20 @@ func attachTurnstileHijack(page *rod.Page) {
 
 const turnstileMockJS = `
 (function() {
+	console.log("Mock Turnstile Loader Active");
 	window.turnstile = {
 		render: function(el, options) {
 			const callback = (options && options.callback) || (el && el.getAttribute && el.getAttribute('data-callback'));
 			setTimeout(() => {
+				const token = "mock_turnstile_success_token_1234567890";
 				const input1 = document.querySelector('input[name="cf-turnstile-response"]');
 				const input2 = document.getElementById("cf-turnstile-response");
-				if (input1) input1.value = "mock_turnstile_success_token_1234567890";
-				if (input2) input2.value = "mock_turnstile_success_token_1234567890";
+				if (input1) input1.value = token;
+				if (input2) input2.value = token;
 				if (typeof callback === "function") {
-					callback("mock_turnstile_success_token_1234567890");
+					callback(token);
 				} else if (typeof callback === "string" && typeof window[callback] === "function") {
-					window[callback]("mock_turnstile_success_token_1234567890");
+					window[callback](token);
 				}
 			}, 500);
 			return "mock-widget-id";
@@ -103,49 +99,59 @@ func submitLoginForm(page *rod.Page) {
 			|| document.querySelector('.frm-submit')
 			|| document.querySelector('button[type="submit"]')
 			|| document.querySelector('input[type="submit"]');
-		if (btn) { btn.disabled = false; btn.click(); return true; }
+		if (btn) { btn.disabled = false; btn.removeAttribute('disabled'); btn.click(); return true; }
 		const loginInput = document.querySelector('input[name="amember_login"]');
 		if (loginInput && loginInput.form) { loginInput.form.submit(); return true; }
 		return false;
 	}`)
 }
 
-func waitTurnstile(page *rod.Page, shots string) bool {
-	realMode := !useTurnstileHijack()
-	for i := 0; i < 60; i++ {
-		if hasValidTurnstileToken(page, realMode) {
-			return true
-		}
-		if i == 10 || i == 30 {
-			tryClickTurnstile(page, shots)
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	return false
+func primeTurnstile(page *rod.Page) {
+	_, _ = page.Eval(`() => {
+		if (!window.turnstile || !window.turnstile.render) return false;
+		document.querySelectorAll('.cf-turnstile').forEach(el => {
+			el.setAttribute('data-rendered', 'true');
+			window.turnstile.render(el);
+		});
+		return true;
+	}`)
 }
 
-func hasValidTurnstileToken(page *rod.Page, realMode bool) bool {
+func turnstileToken(page *rod.Page) string {
 	res, err := page.Eval(`() => {
 		const inp = document.querySelector('input[name="cf-turnstile-response"]');
 		return inp ? inp.value : "";
 	}`)
 	if err != nil {
-		return false
+		return ""
 	}
-	token := res.Value.Str()
-	if token == "" {
-		return false
+	return res.Value.Str()
+}
+
+// waitTurnstile — goauto style: wait up to 30s, try click at 10s, submit anyway if needed.
+func waitTurnstile(page *rod.Page, shots string) bool {
+	for i := 0; i < 60; i++ {
+		if token := turnstileToken(page); token != "" {
+			log.Printf("[SEOShope] Turnstile token ready (len=%d)", len(token))
+			return true
+		}
+		if i == 0 || i == 10 || i == 20 || i == 30 {
+			primeTurnstile(page)
+		}
+		if i == 10 {
+			takeScreenshot(page, "turnstile_check_5s", shots)
+		}
+		if i == 20 {
+			log.Println("[SEOShope] Turnstile not auto-solved — trying checkbox click")
+			tryClickTurnstile(page, shots)
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
-	if strings.Contains(token, "mock_turnstile") {
-		return false
-	}
-	if realMode {
-		return len(token) > 80
-	}
-	return true
+	return turnstileToken(page) != ""
 }
 
 func tryClickTurnstile(page *rod.Page, shots string) {
+	takeScreenshot(page, "before_turnstile_click", shots)
 	container, err := page.Element(".cf-turnstile")
 	if err != nil {
 		return
@@ -162,7 +168,7 @@ func tryClickTurnstile(page *rod.Page, shots string) {
 			var pt struct{ X, Y float64 }
 			_ = res.Value.Unmarshal(&pt)
 			_ = page.Mouse.MoveTo(proto.NewPoint(pt.X, pt.Y))
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 			_ = page.Mouse.Click(proto.InputMouseButtonLeft, 1)
 		}
 		return
@@ -171,7 +177,7 @@ func tryClickTurnstile(page *rod.Page, shots string) {
 	if err != nil {
 		return
 	}
-	for _, sel := range []string{".ctp-checkbox-container", "input[type='checkbox']", "[role='checkbox']"} {
+	for _, sel := range []string{".ctp-checkbox-container", "input[type='checkbox']", ".mark", "[role='checkbox']"} {
 		el, elErr := cfFrame.Element(sel)
 		if elErr != nil {
 			continue

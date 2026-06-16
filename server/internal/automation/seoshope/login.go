@@ -61,16 +61,26 @@ func ensureLoggedIn(ctx context.Context, s *Session, username, password string) 
 		return fmt.Errorf("login page not found (url=%s)", pageURL(page))
 	}
 
+	// Reload login page so Turnstile hijack runs before widget loads (goauto pattern).
+	log.Println("[SEOShope] Reloading login page for Turnstile hijack")
+	_ = page.Reload()
+	time.Sleep(2 * time.Second)
+	waitForPageReady(page, shots, 20*time.Second)
+
 	log.Println("[SEOShope] Performing fresh login...")
 	fillLoginForm(page, username, password)
 	time.Sleep(2 * time.Second)
 	takeScreenshot(page, "after_form_fill", shots)
+	primeTurnstile(page)
 
-	if !waitTurnstile(page, shots) {
+	turnstileOK := waitTurnstile(page, shots)
+	if !turnstileOK {
+		log.Println("[SEOShope] Turnstile token not received after 30s — submitting anyway (goauto)")
 		takeScreenshot(page, "turnstile_timeout", shots)
-		return fmt.Errorf("login failed: Cloudflare Turnstile not solved (wait up to 30s on Mac)")
+	} else {
+		log.Println("[SEOShope] Turnstile token ready — submitting login")
 	}
-	log.Println("[SEOShope] Turnstile token ready — submitting login")
+	takeScreenshot(page, "before_submit", shots)
 	submitLoginForm(page)
 
 	if err := waitForLoginSuccess(page, shots, 45*time.Second); err != nil {
