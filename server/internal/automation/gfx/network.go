@@ -73,10 +73,6 @@ func gfxShouldBlockRequest(rtype proto.NetworkResourceType, url string) bool {
 		return true
 	}
 
-	if rtype == proto.NetworkResourceTypeStylesheet && !gfxIsEssentialHost(u) {
-		return true
-	}
-
 	for _, frag := range []string{
 		".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".avif",
 		".woff", ".woff2", ".ttf", ".otf", ".eot",
@@ -100,5 +96,5 @@ func logGFXNetworkFilterOnce() {
 	if os.Getenv("GFX_BLOCK_IMAGES") == "0" {
 		return
 	}
-	log.Println("[GFX] Network filter on (blocked: images, fonts, media, analytics)")
+	log.Println("[GFX] Network filter on (blocked: images, fonts, media, analytics — CSS allowed)")
 }

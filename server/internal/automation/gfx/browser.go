@@ -69,12 +69,17 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 func requireExtensionLoaded(browser *rod.Browser, extPath, accountID string) error {
 	page := stealth.MustPage(browser)
 	defer func() { _ = page.Close() }()
-	_ = page.Navigate("about:blank")
-	if waitExtensionInject(page, 16) {
+	// Content scripts do not run on about:blank — probe on GFX sign-in instead.
+	log.Printf("[GFX] Verifying extension on %s (account=%s)", gfxSigninURL, accountID)
+	if err := page.Timeout(30 * time.Second).Navigate(gfxSigninURL); err != nil {
+		log.Printf("[GFX] Extension probe navigation warning: %v", err)
+	}
+	time.Sleep(2 * time.Second)
+	if waitExtensionInject(page, 20) {
 		log.Printf("[GFX] Extension loaded OK (account=%s)", accountID)
 		return nil
 	}
-	return fmt.Errorf("GFX extension failed to load from %s", extPath)
+	return fmt.Errorf("GFX extension failed to load from %s (no inject on %s)", extPath, gfxSigninURL)
 }
 
 func (s *Session) Close() {
