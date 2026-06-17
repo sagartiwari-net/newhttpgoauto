@@ -21,6 +21,7 @@ import (
 
 func main() {
 	cfg := config.Load()
+	log.Printf("🚀 GoHttpAuto start role=%s port=%s cwd=%s", cfg.Role, cfg.Port, mustWd())
 
 	var dbErr error
 	if cfg.Role == "worker" {
@@ -119,4 +120,12 @@ func main() {
 
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+func mustWd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "?"
+	}
+	return wd
 }

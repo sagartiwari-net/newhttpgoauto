@@ -29,6 +29,6 @@
   <key>StandardOutPath</key>
   <string>__HOME__/Library/Logs/gohttpauto/worker.log</string>
   <key>StandardErrorPath</key>
-  <string>__HOME__/Library/Logs/gohttpauto/worker.err.log</string>
+  <string>__HOME__/Library/Logs/gohttpauto/worker.log</string>
 </dict>
 </plist>
