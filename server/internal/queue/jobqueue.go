@@ -13,7 +13,7 @@ import (
 const (
 	stalePendingAfter  = 15 * time.Minute
 	queueMaintainEvery = 15 * time.Second
-	queuePollInterval  = 1 * time.Second
+	queuePollInterval  = 300 * time.Millisecond
 	workerHeartbeatKey = "worker:heartbeat"
 	workerAliveWindow  = 90 * time.Second
 	workerHeartbeatEvery = 5 * time.Second
@@ -155,7 +155,7 @@ func CancelJob(id int) (bool, error) {
 func ExpireStaleJobs() int {
 	cancelOrphanPending()
 	pendingSec := int(stalePendingAfter.Seconds())
-	runSec := int(MaxTaskRunTimeout.Seconds())
+	runSec := int(TaskRunTimeout.Seconds())
 
 	res, _ := db.DB.Exec(`
 		UPDATE job_queue SET status='failed', finished_at=NOW()
@@ -201,7 +201,7 @@ func StartQueueMaintenance() {
 			ExpireStaleJobs()
 		}
 	}()
-	log.Println("🧹 [QUEUE] Stale job cleanup started (70s default, 90s GFX max)")
+	log.Println("🧹 [QUEUE] Stale job cleanup started (70s run timeout)")
 }
 
 // StartJobPoller runs on worker — picks pending jobs from MySQL and executes locally.

@@ -3,14 +3,13 @@ package gfx
 import (
 	"context"
 	"log"
-	"os"
+	"time"
 )
 
+const taskTimeout = 75 * time.Second
+
 // Run executes a GFX task with pool routing and parallel Chrome limits.
-func Run(ctx context.Context, taskUID string) (status, msg string) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func Run(taskUID string) (status, msg string) {
 	tool, ok := ToolFor(taskUID)
 	if !ok {
 		return "failed", "unknown gfx task: " + taskUID
@@ -18,6 +17,9 @@ func Run(ctx context.Context, taskUID string) (status, msg string) {
 
 	AcquireParallel()
 	defer ReleaseParallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+	defer cancel()
 
 	slot, err := ResolveSlot(ctx, taskUID)
 	if err != nil {
@@ -29,10 +31,6 @@ func Run(ctx context.Context, taskUID string) (status, msg string) {
 	defer mu.Unlock()
 
 	log.Printf("[GFX] Task %s → account %s profile %s", taskUID, slot.Account.WebsiteID, slot.ProfileDir)
-	log.Printf("[GFX] Error screenshots → %s", screenshotRoot()+"/gfx/")
-	if os.Getenv("GFX_VISIBLE") == "1" {
-		log.Printf("[GFX] Chrome visible (GFX_VISIBLE=1) — watch Mac screen during task")
-	}
 
 	session, err := newSession(ctx, slot)
 	if err != nil {

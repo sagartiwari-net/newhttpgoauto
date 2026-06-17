@@ -22,7 +22,7 @@ import (
 func preOpenSettle(tool ToolDef) time.Duration {
 	switch tool.WebsiteID {
 	case "airbrush":
-		return 3 * time.Second
+		return 7 * time.Second
 	}
 	if tool.SkipPageReload {
 		return 6 * time.Second
@@ -36,7 +36,7 @@ func preOpenSettle(tool ToolDef) time.Duration {
 func postReloadSettle(tool ToolDef) time.Duration {
 	switch tool.WebsiteID {
 	case "airbrush":
-		return 2 * time.Second
+		return 5 * time.Second
 	}
 	if tool.CaptureLocalStorage {
 		return 4 * time.Second
@@ -83,16 +83,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	if gfxGuestVisible(page) || !gfxLoggedIn(page) {
-		shot := saveErrorScreenshot(page, tool.WebsiteID, "not_logged_in")
-		msg := fmt.Sprintf("not logged in on tool page — session expired? (account %s)", session.Slot().Account.WebsiteID)
-		if shot != "" {
-			msg += " | screenshot: " + shot
-		}
-		return fmt.Errorf("%s", msg)
-	}
-
-	// Dismiss non-auth dialogs only.
+	// Dismiss dialogs/modals
 	_, _ = page.Eval(`() => {
 		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
 		document.dispatchEvent(ev);
@@ -102,19 +93,66 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	}`)
 	time.Sleep(150 * time.Millisecond)
 
-	settle := preOpenSettle(tool)
-	log.Printf("[gfx_%s] Waiting %s for tool page to render...", tool.WebsiteID, settle)
-	time.Sleep(settle)
-	log.Printf("[gfx_%s] Waiting for access button (selector: %s)", tool.WebsiteID, tool.Selector)
-	btnMatch := waitForAccessButton(page, tool)
+	// Brief settle — tool card / Access Now button may render 1-2s after login redirect.
+	time.Sleep(2 * time.Second)
 
-	if !btnMatch.found {
-		shot := saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
+	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
+	btnFound := false
+	var btnSelectorClicked string
+	var useFallback bool
+	actualIndex := tool.FallbackIndex
+
+	for idxPoll := 0; idxPoll < 24; idxPoll++ {
+		hasBtn, _, _ := page.Has(tool.Selector)
+		if hasBtn {
+			btnFound = true
+			btnSelectorClicked = tool.Selector
+			break
+		}
+		resCheck, errCheck := page.Eval(`(idx) => {
+			const list = document.querySelectorAll('button[data-tool-cookie="true"]');
+			if (list.length > idx) return { found: true, actualIndex: idx };
+			if (list.length > 0) return { found: true, actualIndex: 0 };
+			return { found: false, actualIndex: -1 };
+		}`, tool.FallbackIndex)
+		if errCheck == nil && resCheck.Value.Get("found").Bool() {
+			btnFound = true
+			useFallback = true
+			actualIndex = resCheck.Value.Get("actualIndex").Int()
+			if actualIndex != tool.FallbackIndex {
+				log.Printf("[gfx_%s] ⚠️ Fallback index %d not available, falling back to index %d", tool.WebsiteID, tool.FallbackIndex, actualIndex)
+			}
+			break
+		}
+		resAccess, errAccess := page.Eval(`() => {
+			const btn = [...document.querySelectorAll('button')].find(b =>
+				(b.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase().includes('access now'));
+			if (btn) { btn.setAttribute('data-gfx-access-btn','1'); return true; }
+			return false;
+		}`)
+		if errAccess == nil && resAccess.Value.Bool() {
+			btnFound = true
+			btnSelectorClicked = `[data-gfx-access-btn="1"]`
+			log.Printf("[gfx_%s] Found Access Now button", tool.WebsiteID)
+			break
+		}
+		if idxPoll == 4 && !btnFound {
+			log.Printf("[gfx_%s] Scrolling page to trigger lazy buttons...", tool.WebsiteID)
+			_, _ = page.Eval(`() => {
+				window.scrollTo(0, document.body.scrollHeight);
+				window.scrollTo(0, 0);
+			}`)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	if !btnFound {
+		saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
+		// Dump buttons info to debug
 		resDebug, errDebug := page.Eval(`() => {
-			const btns = Array.from(document.querySelectorAll('button, a'));
+			const btns = Array.from(document.querySelectorAll('button'));
 			return JSON.stringify(btns.map(b => ({
-				tag: b.tagName,
-				text: (b.textContent||'').trim().slice(0, 80),
+				text: b.textContent,
 				tldr: b.getAttribute('data-tldr'),
 				cookie: b.getAttribute('data-tool-cookie'),
 				className: b.className
@@ -122,30 +160,50 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		}`)
 		if errDebug == nil {
 			log.Printf("[gfx_%s] Debug buttons on page: %s", tool.WebsiteID, resDebug.Value.Str())
+		} else {
+			log.Printf("[gfx_%s] Failed to dump debug buttons: %v", tool.WebsiteID, errDebug)
 		}
-		msg := fmt.Sprintf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
-		if shot != "" {
-			msg += " | screenshot: " + shot
-		}
-		return fmt.Errorf("%s", msg)
+		return fmt.Errorf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
 	}
 
-	// Click button to open target tool
+	// Setup event listener to capture the new tab ID
+	var targetID proto.TargetTargetID
+	wait := browser.EachEvent(func(e *proto.TargetTargetCreated) bool {
+		if e.TargetInfo.Type == proto.TargetTargetInfoTypePage {
+			targetID = e.TargetInfo.TargetID
+			return true // stop listening
+		}
+		return false
+	})
+
+	// Click button to lease new tab and check return value
 	log.Printf("[gfx_%s] Clicking access button to open tool...", tool.WebsiteID)
-	clicked, err := clickAccessButton(page, btnMatch, tool)
+	resClick, err := page.Eval(`(sel, idx, useFB) => {
+		let btn;
+		if (useFB) {
+			btn = document.querySelectorAll('button[data-tool-cookie="true"]')[idx];
+		} else {
+			btn = document.querySelector(sel);
+		}
+		if (btn) {
+			btn.scrollIntoView({ block: 'center' });
+			btn.click();
+			return true;
+		}
+		return false;
+	}`, btnSelectorClicked, actualIndex, useFallback)
+
 	if err != nil {
 		return fmt.Errorf("failed to click access button: %w", err)
 	}
-	if !clicked {
+	if !resClick.Value.Bool() {
 		saveErrorScreenshot(page, tool.WebsiteID, "click_failed")
-		return fmt.Errorf("SSO Access button click failed (selector: %s)", btnMatch.selector)
+		return fmt.Errorf("SSO Access button click failed (selector: %s, fallback: %v)", btnSelectorClicked, useFallback)
 	}
 
-	log.Printf("[gfx_%s] Access button clicked — waiting for tool tab...", tool.WebsiteID)
-	newPage, err := waitForToolPage(ctx, browser, page, tool)
-	if err != nil {
-		return err
-	}
+	log.Printf("[gfx_%s] Access button clicked successfully! Waiting for new tab context...", tool.WebsiteID)
+	wait()
+	newPage := browser.MustPageFromTargetID(targetID)
 
 	// Wait for new page URL to resolve
 	log.Printf("[gfx_%s] Waiting for new tab navigation...", tool.WebsiteID)
@@ -180,16 +238,6 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	rootDomain := strings.Join(parts, ".")
 	log.Printf("[gfx_%s] Root domain for cookies: %s", tool.WebsiteID, rootDomain)
 
-	// GFX extension injects session into the tool tab — wait before capture (goauto uses ~8s for airbrush).
-	if tool.CaptureLocalStorage {
-		injectWait := 4 * time.Second
-		if tool.WebsiteID == "airbrush" {
-			injectWait = 5 * time.Second
-		}
-		log.Printf("[gfx_%s] Waiting %s for extension session inject...", tool.WebsiteID, injectWait)
-		time.Sleep(injectWait)
-	}
-
 	if tool.SkipPageReload {
 		if err := captureSessionFast(ctx, newPage, tool, rootDomain, page, browser, dataDir); err != nil {
 			log.Printf("[gfx_%s] Fast capture incomplete (%v) — falling back to reload capture", tool.WebsiteID, err)
@@ -199,11 +247,13 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	}
 
 	// Attempt Cloudflare bypass if challenge is detected on target page
-	if tool.WebsiteID != "airbrush" {
-		handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
-	}
+	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
 
-	// Intercept request cookies via CDP (must be enabled before reload)
+	settle := preOpenSettle(tool)
+	log.Printf("[gfx_%s] Settle wait %s before capture...", tool.WebsiteID, settle)
+	time.Sleep(settle)
+
+	// Intercept request cookies via CDP
 	_ = proto.NetworkEnable{}.Call(newPage)
 
 	var capturedCookieHeader string
@@ -275,11 +325,8 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 
 	headerPolls := 10
 	headerInterval := 500 * time.Millisecond
-	if tool.WebsiteID == "airbrush" {
-		headerPolls = 10
-		headerInterval = 500 * time.Millisecond
-	} else if len(tool.SessionCookieNames) > 0 {
-		headerPolls = 12
+	if len(tool.SessionCookieNames) > 0 || tool.WebsiteID == "airbrush" {
+		headerPolls = 15
 		headerInterval = 1 * time.Second
 	}
 	for i := 0; i < headerPolls; i++ {
@@ -423,19 +470,10 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		cookieHeaderString = strings.Join(pairs, "; ")
 	}
 
-	if tool.WebsiteID == "airbrush" && !airbrushSessionReady(rawCookies, localStorageData) {
-		saveErrorScreenshot(newPage, tool.WebsiteID, "no_session_reload")
-		return fmt.Errorf("airbrush session not ready after capture (no loginSet cookie or firebase auth)")
-	}
-
-	// Close tool tabs after capture data is in memory.
+	// Close tool tabs before DB save so Chrome shuts down faster after task ends.
 	closeGFXPages(browser, page, newPage)
 
-	if err := saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, indexedDBData, cookieHeaderString); err != nil {
-		return err
-	}
-	log.Printf("[gfx_%s] ✅ DB + webhook updated for %s", tool.WebsiteID, tool.WebsiteID)
-	return nil
+	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, indexedDBData, cookieHeaderString)
 }
 
 func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, rootDomain string, gfxPage *rod.Page, browser *rod.Browser, dataDir string) error {
@@ -483,11 +521,7 @@ func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, ro
 	}
 
 	closeGFXPages(browser, gfxPage, newPage)
-	if err := saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString); err != nil {
-		return err
-	}
-	log.Printf("[gfx_%s] ✅ DB + webhook updated for %s", tool.WebsiteID, tool.WebsiteID)
-	return nil
+	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString)
 }
 
 func airbrushSessionReady(rawCookies []CookieJSON, localStorageData map[string]interface{}) bool {
@@ -618,9 +652,7 @@ func saveCapturedSession(
 		toolID = tool.WebsiteID
 	}
 	payload := string(jsonBytes)
-	if err := notify1clkWebhook(taskUID, toolID, tool.WebsiteID, payload); err != nil {
-		return fmt.Errorf("DB saved but webhook failed: %w", err)
-	}
+	go notify1clkWebhook(taskUID, toolID, tool.WebsiteID, payload)
 
 	log.Printf("🎉 [gfx_%s] GFX %s automation completed successfully!", tool.WebsiteID, tool.Name)
 	return nil
@@ -758,7 +790,7 @@ func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, 
 }
 
 // notify1clkWebhook POSTs captured session to tools.1clkaccess.store webhook.
-func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) error {
+func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) {
 	const (
 		webhookURL    = "https://tools.1clkaccess.store/webhooks/goauto-complete"
 		webhookSecret = "whsec_gfx_1clkaccess_2026"
@@ -778,13 +810,15 @@ func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) error {
 
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("webhook payload marshal: %w", err)
+		log.Printf("⚠️ [gfx_webhook] Webhook payload marshal failed for %s: %v", toolID, err)
+		return
 	}
 
 	log.Printf("📤 [gfx_webhook] Sending webhook for %s to %s...", toolID, webhookURL)
 	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("webhook request create: %w", err)
+		log.Printf("⚠️ [gfx_webhook] Webhook request create failed for %s: %v", toolID, err)
+		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Webhook-Secret", webhookSecret)
@@ -792,14 +826,15 @@ func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("webhook POST: %w", err)
+		log.Printf("⚠️ [gfx_webhook] Webhook POST failed for %s: %v", toolID, err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		log.Printf("✅ [gfx_webhook] 1Clk Access webhook succeeded for %s — cookies updated in dashboard", toolID)
-		return nil
+	} else {
+		log.Printf("⚠️ [gfx_webhook] Webhook returned HTTP %d for %s", resp.StatusCode, toolID)
 	}
-	return fmt.Errorf("webhook HTTP %d for %s", resp.StatusCode, toolID)
 }
 

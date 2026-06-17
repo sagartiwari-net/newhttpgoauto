@@ -18,7 +18,6 @@ const maxErrorScreenshots = 5
 
 var safeStepName = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
-// screenshotRoot is where failure screenshots are saved (Desktop on Mac worker).
 func screenshotRoot() string {
 	if p := os.Getenv("GOAUTO_SCREENSHOT_PATH"); p != "" {
 		return p
@@ -39,21 +38,20 @@ func errorScreenshotDir(group string) string {
 	return filepath.Join(screenshotRoot(), "gfx", group)
 }
 
-// saveErrorScreenshot captures the page on failure; returns full path written (empty on failure).
-func saveErrorScreenshot(page *rod.Page, group, step string) string {
+func saveErrorScreenshot(page *rod.Page, group, step string) {
 	if page == nil {
-		return ""
+		return
 	}
 	img, err := page.Timeout(15 * time.Second).Screenshot(true, nil)
 	if err != nil {
 		log.Printf("[GFX] Screenshot failed (%s/%s): %v", group, step, err)
-		return ""
+		return
 	}
 
 	dir := errorScreenshotDir(group)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		log.Printf("[GFX] Screenshot dir error: %v", err)
-		return ""
+		return
 	}
 
 	step = strings.Trim(safeStepName.ReplaceAllString(step, "_"), "_")
@@ -64,11 +62,10 @@ func saveErrorScreenshot(page *rod.Page, group, step string) string {
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, img, 0644); err != nil {
 		log.Printf("[GFX] Screenshot write error: %v", err)
-		return ""
+		return
 	}
 	pruneErrorScreenshots(dir)
 	log.Printf("[GFX] Error screenshot → %s", path)
-	return path
 }
 
 type shotFile struct {

@@ -1,8 +1,6 @@
 package queue
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -16,21 +14,7 @@ import (
 	"gohttpauto/internal/db"
 )
 
-const (
-	TaskRunTimeout    = 70 * time.Second
-	GFXTaskRunTimeout = 90 * time.Second
-)
-
-// MaxTaskRunTimeout is used for stale-job cleanup.
-const MaxTaskRunTimeout = GFXTaskRunTimeout
-
-// TaskRunTimeoutFor returns the wall-clock limit for a task UID.
-func TaskRunTimeoutFor(taskUID string) time.Duration {
-	if gfx.IsGFXTask(taskUID) {
-		return GFXTaskRunTimeout
-	}
-	return TaskRunTimeout
-}
+const TaskRunTimeout = 70 * time.Second
 
 var (
 	activeMu  sync.Mutex
@@ -127,31 +111,27 @@ func RunSync(taskUID, triggeredBy string) bool {
 	return true
 }
 
-// ExecuteWithTimeout runs automation with a hard wall-clock limit (per-task).
+// ExecuteWithTimeout runs automation with a hard wall-clock limit.
 func ExecuteWithTimeout(taskUID, automationType string) (status, msg string) {
-	timeout := TaskRunTimeoutFor(taskUID)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	type result struct {
 		status, msg string
 	}
 	ch := make(chan result, 1)
 	go func() {
-		s, m := Execute(ctx, taskUID, automationType)
+		s, m := Execute(taskUID, automationType)
 		ch <- result{s, m}
 	}()
 	select {
 	case r := <-ch:
 		return r.status, r.msg
-	case <-ctx.Done():
-		log.Printf("⏱️ [QUEUE] %s timed out after %s", taskUID, timeout)
-		return "failed", fmt.Sprintf("task timeout after %d seconds", int(timeout.Seconds()))
+	case <-time.After(TaskRunTimeout):
+		log.Printf("⏱️ [QUEUE] %s timed out after %s", taskUID, TaskRunTimeout)
+		return "failed", "task timeout after 70 seconds"
 	}
 }
 
 // Execute runs automation — HTTP engines plug in here.
-func Execute(ctx context.Context, taskUID, automationType string) (status, msg string) {
+func Execute(taskUID, automationType string) (status, msg string) {
 	switch taskUID {
 	case "nox_runSemrush":
 		return nox.RunSemrush()
@@ -166,7 +146,7 @@ func Execute(ctx context.Context, taskUID, automationType string) (status, msg s
 			return seoshope.Run(taskUID)
 		}
 		if gfx.IsGFXTask(taskUID) {
-			return gfx.Run(ctx, taskUID)
+			return gfx.Run(taskUID)
 		}
 		return "failed", "automation not implemented yet: " + taskUID
 	}
