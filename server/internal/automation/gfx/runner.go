@@ -4,13 +4,13 @@ import (
 	"context"
 	"log"
 	"os"
-	"time"
 )
 
-const taskTimeout = 75 * time.Second
-
 // Run executes a GFX task with pool routing and parallel Chrome limits.
-func Run(taskUID string) (status, msg string) {
+func Run(ctx context.Context, taskUID string) (status, msg string) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	tool, ok := ToolFor(taskUID)
 	if !ok {
 		return "failed", "unknown gfx task: " + taskUID
@@ -18,9 +18,6 @@ func Run(taskUID string) (status, msg string) {
 
 	AcquireParallel()
 	defer ReleaseParallel()
-
-	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
-	defer cancel()
 
 	slot, err := ResolveSlot(ctx, taskUID)
 	if err != nil {

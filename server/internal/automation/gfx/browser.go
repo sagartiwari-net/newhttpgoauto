@@ -67,17 +67,25 @@ func (s *Session) Close() {
 		return
 	}
 	if os.Getenv("GFX_KEEP_OPEN") == "1" {
-		log.Printf("[GFX] Keeping browser open 90s for inspection (account=%s)", s.slot.Account.WebsiteID)
-		time.Sleep(90 * time.Second)
-	}
-	log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
-	if s.browser != nil {
-		_ = s.browser.Close()
+		browser := s.browser
+		s.browser = nil
+		log.Printf("[GFX] Keeping browser open 12s for inspection (account=%s) — task can finish now", s.slot.Account.WebsiteID)
+		go func() {
+			time.Sleep(12 * time.Second)
+			if browser != nil {
+				_ = browser.Close()
+			}
+		}()
+	} else {
+		log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
+		if s.browser != nil {
+			_ = s.browser.Close()
+		}
+		s.browser = nil
 	}
 	if s.cancel != nil {
 		s.cancel()
 	}
-	s.browser = nil
 }
 
 func (s *Session) Browser() *rod.Browser { return s.browser }

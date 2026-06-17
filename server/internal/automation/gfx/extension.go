@@ -130,17 +130,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		return fmt.Errorf("%s", msg)
 	}
 
-	// Setup event listener to capture the new tab ID
-	var targetID proto.TargetTargetID
-	wait := browser.EachEvent(func(e *proto.TargetTargetCreated) bool {
-		if e.TargetInfo.Type == proto.TargetTargetInfoTypePage {
-			targetID = e.TargetInfo.TargetID
-			return true // stop listening
-		}
-		return false
-	})
-
-	// Click button to lease new tab and check return value
+	// Click button to open target tool
 	log.Printf("[gfx_%s] Clicking access button to open tool...", tool.WebsiteID)
 	clicked, err := clickAccessButton(page, btnMatch, tool)
 	if err != nil {
@@ -151,9 +141,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		return fmt.Errorf("SSO Access button click failed (selector: %s)", btnMatch.selector)
 	}
 
-	log.Printf("[gfx_%s] Access button clicked successfully! Waiting for new tab context...", tool.WebsiteID)
-	wait()
-	newPage := browser.MustPageFromTargetID(targetID)
+	log.Printf("[gfx_%s] Access button clicked — waiting for tool tab...", tool.WebsiteID)
+	newPage, err := waitForToolPage(ctx, browser, page, tool)
+	if err != nil {
+		return err
+	}
 
 	// Wait for new page URL to resolve
 	log.Printf("[gfx_%s] Waiting for new tab navigation...", tool.WebsiteID)
@@ -602,7 +594,9 @@ func saveCapturedSession(
 		toolID = tool.WebsiteID
 	}
 	payload := string(jsonBytes)
-	go notify1clkWebhook(taskUID, toolID, tool.WebsiteID, payload)
+	if err := notify1clkWebhook(taskUID, toolID, tool.WebsiteID, payload); err != nil {
+		return fmt.Errorf("DB saved but webhook failed: %w", err)
+	}
 
 	log.Printf("🎉 [gfx_%s] GFX %s automation completed successfully!", tool.WebsiteID, tool.Name)
 	return nil
@@ -740,7 +734,7 @@ func handleTargetPageCloudflare(ctx context.Context, page *rod.Page, websiteID, 
 }
 
 // notify1clkWebhook POSTs captured session to tools.1clkaccess.store webhook.
-func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) {
+func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) error {
 	const (
 		webhookURL    = "https://tools.1clkaccess.store/webhooks/goauto-complete"
 		webhookSecret = "whsec_gfx_1clkaccess_2026"
@@ -760,15 +754,13 @@ func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) {
 
 	payload, err := json.Marshal(body)
 	if err != nil {
-		log.Printf("⚠️ [gfx_webhook] Webhook payload marshal failed for %s: %v", toolID, err)
-		return
+		return fmt.Errorf("webhook payload marshal: %w", err)
 	}
 
 	log.Printf("📤 [gfx_webhook] Sending webhook for %s to %s...", toolID, webhookURL)
 	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("⚠️ [gfx_webhook] Webhook request create failed for %s: %v", toolID, err)
-		return
+		return fmt.Errorf("webhook request create: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Webhook-Secret", webhookSecret)
@@ -776,15 +768,14 @@ func notify1clkWebhook(taskUID, toolID, websiteID, cookiesJSON string) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("⚠️ [gfx_webhook] Webhook POST failed for %s: %v", toolID, err)
-		return
+		return fmt.Errorf("webhook POST: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		log.Printf("✅ [gfx_webhook] 1Clk Access webhook succeeded for %s — cookies updated in dashboard", toolID)
-	} else {
-		log.Printf("⚠️ [gfx_webhook] Webhook returned HTTP %d for %s", resp.StatusCode, toolID)
+		return nil
 	}
+	return fmt.Errorf("webhook HTTP %d for %s", resp.StatusCode, toolID)
 }
 

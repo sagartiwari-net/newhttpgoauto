@@ -16,7 +16,7 @@ func initRegistry() {
 		CaptureLocalStorage: true,
 		CaptureIndexedDB: false,
 		UseLSPayloadFormat: false,
-		SkipPageReload: false,
+		SkipPageReload: true,
 	},
 	"gfx_runAnswerthepublic": {
 		TaskUID: "gfx_runAnswerthepublic", Kind: KindExtension,
