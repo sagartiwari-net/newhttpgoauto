@@ -88,16 +88,6 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 		return fmt.Errorf("write portal cookie file: %w", err)
 	}
 
-	// Easy access copy on Desktop (worker Mac).
-	if home := os.Getenv("HOME"); home != "" {
-		desktopPath := filepath.Join(home, "Desktop", "gfx_portal_homepage.json")
-		if err := os.WriteFile(desktopPath, jsonBytes, 0644); err != nil {
-			log.Printf("[gfx_portal] Desktop copy failed: %v", err)
-		} else {
-			log.Printf("[gfx_portal] Desktop copy: %s", desktopPath)
-		}
-	}
-
 	log.Printf("[gfx_portal] ✅ Saved homepage session to %s (%d cookies, %d LS keys)",
 		outPath, len(rawCookies), len(localStorageData))
 	return nil

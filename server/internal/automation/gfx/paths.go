@@ -38,6 +38,14 @@ func profileDirForPortal(websiteID string) string {
 }
 
 func portalHomepageCookieFile() string {
+	if p := os.Getenv("GFX_PORTAL_COOKIE_PATH"); p != "" {
+		return p
+	}
+	if runtime.GOOS == "darwin" {
+		if home := os.Getenv("HOME"); home != "" {
+			return filepath.Join(home, "Desktop", "gfx_portal_homepage.json")
+		}
+	}
 	return filepath.Join(cookiesBackupDir(), "gfx_portal_homepage.json")
 }
 
