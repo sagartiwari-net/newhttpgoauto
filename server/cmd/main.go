@@ -35,19 +35,23 @@ func main() {
 	defer db.Close()
 
 	handlers.EnsureMasterUser(cfg.MasterUsername, cfg.MasterPassword)
-	dbseed.EnsureTasks()
+	if cfg.Role != "worker" {
+		dbseed.EnsureTasks()
+	}
 	handlers.StartLogCleanupLoop()
 	if cfg.Role == "worker" {
 		queue.StartJobPoller()
-		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
+		log.Printf("🔧 [ROLE] worker — polling job_queue on Mac")
 	} else {
 		queue.StartQueueMaintenance()
 		log.Printf("🔧 [ROLE] panel — runs tasks on server; only GFX queued for Mac worker")
 	}
-	if cfg.EnableScheduler {
+	if cfg.Role != "worker" && cfg.EnableScheduler {
 		scheduler.Start()
+	} else if cfg.Role == "worker" {
+		log.Println("⏰ [SCHEDULER] Disabled on worker (panel enqueues GFX jobs)")
 	} else {
-		log.Println("⏰ [SCHEDULER] Disabled — API/dashboard only (set ENABLE_SCHEDULER=true on worker)")
+		log.Println("⏰ [SCHEDULER] Disabled — set ENABLE_SCHEDULER=true to enable")
 	}
 
 	// Worker Mac only needs queue poller + scheduler — no HTTP API (avoids :4011 port conflicts).
