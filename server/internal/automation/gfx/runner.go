@@ -3,13 +3,13 @@ package gfx
 import (
 	"context"
 	"log"
+	"time"
 )
 
+const taskTimeout = 75 * time.Second
+
 // Run executes a GFX task with pool routing and parallel Chrome limits.
-func Run(ctx context.Context, taskUID string) (status, msg string) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func Run(taskUID string) (status, msg string) {
 	tool, ok := ToolFor(taskUID)
 	if !ok {
 		return "failed", "unknown gfx task: " + taskUID
@@ -17,6 +17,9 @@ func Run(ctx context.Context, taskUID string) (status, msg string) {
 
 	AcquireParallel()
 	defer ReleaseParallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+	defer cancel()
 
 	slot, err := ResolveSlot(ctx, taskUID)
 	if err != nil {
@@ -46,9 +49,6 @@ func Run(ctx context.Context, taskUID string) (status, msg string) {
 		}
 		return "success", tool.Name + " session captured (" + slot.Account.WebsiteID + ")"
 	case KindCredFetch:
-		if _, err := ensureGFXLogin(ctx, session, ""); err != nil {
-			return "failed", "gfx login failed: " + err.Error()
-		}
 		if err := runCredScraper(ctx, session, tool); err != nil {
 			return "failed", err.Error()
 		}

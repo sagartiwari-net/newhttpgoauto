@@ -83,12 +83,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	if !gfxLoggedIn(page) {
-		saveErrorScreenshot(page, tool.WebsiteID, "not_logged_in")
-		return fmt.Errorf("not logged in to GFX portal (session expired?) — check gfxtoolz account %s", session.Slot().Account.WebsiteID)
-	}
-
-	// Dismiss non-auth dialogs only (do not Escape away sign-in flows).
+	// Dismiss dialogs/modals
 	_, _ = page.Eval(`() => {
 		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
 		document.dispatchEvent(ev);

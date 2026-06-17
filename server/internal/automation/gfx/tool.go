@@ -4,9 +4,9 @@ package gfx
 type Kind string
 
 const (
-	KindExtension   Kind = "extension"    // Chrome + GFX extension cookie capture
-	KindCredFetch   Kind = "cred_fetch"   // Scrape username/password from GFX portal
-	KindOneClick    Kind = "oneclick"     // Future: no extension (e.g. Vecteezy)
+	KindExtension Kind = "extension"  // Chrome + GFX extension cookie capture
+	KindCredFetch Kind = "cred_fetch" // Scrape username/password from GFX portal
+	KindOneClick  Kind = "oneclick"   // Future: no extension (e.g. Vecteezy)
 )
 
 // ToolDef is static per-task configuration (selectors, cookie formats, upload ids).

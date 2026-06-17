@@ -6,7 +6,6 @@ const typeBadge = {
   http: 'badge-http',
   chrome_extension: 'badge-chrome',
   chrome_hybrid: 'badge-hybrid',
-  chrome_portal: 'badge-portal',
   cred_fetch: 'badge-cred',
 }
 

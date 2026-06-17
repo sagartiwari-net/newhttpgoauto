@@ -10,7 +10,6 @@ import (
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
 	"gohttpauto/internal/dbseed"
-	"gohttpauto/internal/automation/screenshots"
 	"gohttpauto/internal/handlers"
 	"gohttpauto/internal/middleware"
 	"gohttpauto/internal/queue"
@@ -35,12 +34,9 @@ func main() {
 	defer db.Close()
 
 	handlers.EnsureMasterUser(cfg.MasterUsername, cfg.MasterPassword)
-	dbseed.EnsureSchema()
 	dbseed.EnsureTasks()
 	handlers.StartLogCleanupLoop()
 	if cfg.Role == "worker" {
-		shotDir := screenshots.EnsureDirs()
-		log.Printf("📸 [WORKER] Error screenshots → %s", shotDir)
 		queue.StartJobPoller()
 		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
 	} else {
@@ -84,7 +80,6 @@ func main() {
 			protected.GET("/auth/me", handlers.Me)
 			protected.GET("/stats", handlers.GetStats)
 			protected.GET("/tasks", handlers.ListTasks)
-			protected.POST("/tasks/sync-builtins", middleware.MasterOnly(), handlers.SyncBuiltinTasks)
 			protected.POST("/tasks/toggle", handlers.ToggleTask)
 			protected.POST("/tasks/interval", handlers.UpdateInterval)
 			protected.POST("/tasks/run-manual", handlers.RunTask)

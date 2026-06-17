@@ -13,13 +13,6 @@ echo "==> Building worker..."
 cd "$APP_DIR/server"
 go build -buildvcs=false -o gohttpauto ./cmd
 
-echo "==> Refreshing worker launchd plist..."
-MACOS="$APP_DIR/deploy/macos"
-PLIST_DIR="$HOME/Library/LaunchAgents"
-sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.worker.plist" > "$PLIST_DIR/com.gohttpauto.worker.plist"
-launchctl bootout "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.worker.plist"
-
 echo "==> Restarting worker service..."
 launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || {
   echo "!! launchctl kickstart failed — start manually:"
