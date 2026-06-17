@@ -52,7 +52,7 @@ export default function Queue() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2>Job Queue</h2>
-          <p>Running and pending GFX tasks on the Mac worker. Other tasks run on the server. Stuck jobs auto-fail after 70 seconds.</p>
+          <p>Running and pending GFX tasks on the Mac worker. Other tasks run on the server. Stuck jobs auto-fail after 70 seconds (portal homepage: 120 seconds).</p>
         </div>
         <button className="btn btn-sm" onClick={load} disabled={loading}>
           <RefreshCw size={14} /> Refresh

@@ -19,8 +19,22 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 	accountID := session.Slot().Account.WebsiteID
 	log.Printf("[gfx_portal] Capturing GFX homepage session (account=%s, profile=%s)", accountID, session.Slot().ProfileDir)
 
-	page, loginBody, err := ensurePortalLogin(ctx, session, gfxPortalHomeURL)
+	var page *rod.Page
+	defer func() {
+		if page != nil && ctx.Err() != nil {
+			saveErrorScreenshot(page, accountID, "task_timeout")
+			saveCaptureScreenshot(page, accountID, "task_timeout_debug")
+			log.Printf("[gfx_portal] Task cancelled/timed out — screenshot saved (url check logs above)")
+		}
+	}()
+
+	var loginBody string
+	var err error
+	page, loginBody, err = ensurePortalLogin(ctx, session, gfxPortalHomeURL)
 	if err != nil {
+		if page != nil {
+			saveErrorScreenshot(page, accountID, "signin_error")
+		}
 		return err
 	}
 
@@ -38,10 +52,10 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 		return err
 	}
 
-	log.Printf("[gfx_portal] Settling 8s then polling localStorage...")
-	time.Sleep(8 * time.Second)
+	log.Printf("[gfx_portal] Settling 5s then polling localStorage...")
+	time.Sleep(5 * time.Second)
 
-	localStorageData := waitForPortalLocalStorage(ctx, page, 15*time.Second)
+	localStorageData := waitForPortalLocalStorage(ctx, page, 10*time.Second)
 	if len(localStorageData) == 0 {
 		saveErrorScreenshot(page, accountID, "portal_empty")
 		return fmt.Errorf("no localStorage captured from GFX homepage")
@@ -122,7 +136,7 @@ func tokenFromLoginJSON(parsed map[string]interface{}, key string) string {
 }
 
 func waitForPortalDashboard(ctx context.Context, page *rod.Page) error {
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 30; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
