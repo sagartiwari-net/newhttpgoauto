@@ -1,21 +1,23 @@
 package queue
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log"
 	"time"
 
+	"gohttpauto/internal/automation/gfx"
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
 )
 
 const (
-	stalePendingAfter  = 15 * time.Minute
-	queueMaintainEvery = 15 * time.Second
-	queuePollInterval  = 300 * time.Millisecond
-	workerHeartbeatKey = "worker:heartbeat"
-	workerAliveWindow  = 90 * time.Second
+	stalePendingAfter    = 15 * time.Minute
+	queueMaintainEvery   = 15 * time.Second
+	queuePollInterval    = 100 * time.Millisecond
+	workerHeartbeatKey   = "worker:heartbeat"
+	workerAliveWindow    = 90 * time.Second
 	workerHeartbeatEvery = 5 * time.Second
 )
 
@@ -49,8 +51,6 @@ type WorkerStatus struct {
 
 // Enqueue adds a task for the worker if it is not already pending or running.
 func Enqueue(taskUID, triggeredBy string) error {
-	ExpireStaleJobs()
-
 	var busy int
 	err := db.DB.QueryRow(`
 		SELECT COUNT(*) FROM job_queue
@@ -231,20 +231,38 @@ func startWorkerHeartbeat() {
 }
 
 func pollOnce() {
-	ExpireStaleJobs()
-	for {
+	if err := pingDB(); err != nil {
+		log.Printf("⚠️ [WORKER] DB ping failed: %v", err)
+		return
+	}
+
+	ctx := context.Background()
+	rows, err := db.DB.Query(`
+		SELECT id, task_uid, triggered_by FROM job_queue
+		WHERE status='pending' AND task_uid LIKE 'gfx\\_%' ESCAPE '\\'
+		ORDER BY id ASC LIMIT 20`)
+	if err != nil {
+		log.Printf("⚠️ [WORKER] poll pending jobs failed: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
 		var id int
 		var taskUID, triggeredBy string
-		err := db.DB.QueryRow(`
-			SELECT id, task_uid, triggered_by FROM job_queue
-			WHERE status='pending' AND task_uid LIKE 'gfx\\_%' ESCAPE '\\'
-			ORDER BY id ASC LIMIT 1`).Scan(&id, &taskUID, &triggeredBy)
-		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				log.Printf("⚠️ [WORKER] poll pending jobs failed: %v", err)
-			}
-			return
+		if err := rows.Scan(&id, &taskUID, &triggeredBy); err != nil {
+			continue
 		}
+
+		accountID, err := gfx.AccountForTask(ctx, taskUID)
+		if err != nil {
+			log.Printf("⚠️ [WORKER] skip job #%d (%s): %v", id, taskUID, err)
+			continue
+		}
+		if gfx.IsProfileBusy(accountID) {
+			continue
+		}
+
 		res, err := db.DB.Exec(`
 			UPDATE job_queue SET status='claimed', claimed_by=?, claimed_at=NOW()
 			WHERE id=? AND status='pending'`, workerID(), id)
@@ -254,20 +272,40 @@ func pollOnce() {
 		}
 		n, _ := res.RowsAffected()
 		if n == 0 {
-			return
+			continue
 		}
-		log.Printf("▶️ [WORKER] Claimed job #%d: %s (by %s)", id, taskUID, triggeredBy)
-		go runClaimedJob(id, taskUID, triggeredBy)
+		log.Printf("▶️ [WORKER] Claimed job #%d: %s (profile %s, by %s)", id, taskUID, accountID, triggeredBy)
+		go runClaimedJob(id, taskUID, triggeredBy, accountID)
+		return
 	}
 }
 
-func runClaimedJob(id int, taskUID, triggeredBy string) {
+func pingDB() error {
+	if db.DB == nil {
+		return errors.New("db not initialized")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return db.DB.PingContext(ctx)
+}
+
+func runClaimedJob(id int, taskUID, triggeredBy, accountID string) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("❌ [WORKER] panic in job #%d (%s): %v", id, taskUID, r)
+			gfx.ReleaseProfileBusy(accountID)
 			_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
 		}
 	}()
+
+	if !gfx.TryAcquireProfileBusy(accountID) {
+		log.Printf("⏸️ [WORKER] Profile %s busy — job #%d (%s) back to pending", accountID, id, taskUID)
+		_, _ = db.DB.Exec(`
+			UPDATE job_queue SET status='pending', claimed_by=NULL, claimed_at=NULL
+			WHERE id=? AND status='claimed'`, id)
+		return
+	}
+	defer gfx.ReleaseProfileBusy(accountID)
 
 	ok := RunSync(taskUID, triggeredBy)
 	if !ok {

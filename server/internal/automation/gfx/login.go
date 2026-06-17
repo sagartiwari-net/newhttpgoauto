@@ -19,12 +19,18 @@ func gfxSessionActive(page *rod.Page) bool {
 		if (url.includes('signin')) return false;
 		if (body.includes('SIGN-IN REQUIRED') || body.includes('Sign in to launch')) return false;
 		if (body.includes('Sign in to GFXToolz') && document.querySelector('input[type="password"]')) return false;
-		if (document.querySelector('button[data-tool-cookie="true"]')) return true;
+		const labels = Array.from(document.querySelectorAll('button,a')).map(el => (el.textContent||'').trim());
+		if (labels.includes('Login') && labels.includes('Sign up') && !document.querySelector('[data-tool-cookie="true"]')) return false;
+		if (url.includes('/tools/')) {
+			if (document.querySelector('[data-tool-cookie="true"]')) return true;
+			const t = (s) => (s||'').replace(/\s+/g,' ').trim().toLowerCase();
+			return [...document.querySelectorAll('button,a,[role="button"]')].some(el => {
+				const txt = t(el.textContent);
+				return txt.includes('access now') || txt.includes('get access') || txt.includes('launch') || txt.includes('open tool') || txt === 'access';
+			});
+		}
 		if (document.querySelector('[data-tool-cookie="true"]')) return true;
-		if ([...document.querySelectorAll('button,a')].some(el =>
-			(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase().includes('access now'))) return true;
-		if (body.includes('Premium') && !body.includes('Sign in to GFXToolz')) return true;
-		return false;
+		return !labels.includes('Login') || !labels.includes('Sign up');
 	}`)
 	return err == nil && res.Value.Bool()
 }
@@ -248,16 +254,19 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 }
 
 func waitSessionOnToolPage(ctx context.Context, page *rod.Page, accountID string) error {
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 40; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if gfxSessionActive(page) {
+		if gfxAccessButtonReady(page) || gfxSessionActive(page) {
 			return nil
+		}
+		if i == 5 {
+			scrollPageForButtons(page)
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
-	return fmt.Errorf("tool page loaded but session not active for %s (login may have failed)", accountID)
+	return fmt.Errorf("tool page loaded but access button not ready for %s (login may have failed)", accountID)
 }
 
 func loginBodyHasToken(body string) bool {

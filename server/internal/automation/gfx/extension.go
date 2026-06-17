@@ -66,13 +66,13 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	// Wait for GFX Chrome extension to inject into page
 	log.Printf("[gfx_%s] Waiting for extension to inject...", tool.WebsiteID)
 	extDetected := false
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 30; i++ {
 		res, err := page.Eval(`() => document.documentElement.hasAttribute('data-my-extension-installed')`)
 		if err == nil && res.Value.Bool() {
 			extDetected = true
 			break
 		}
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 	if !extDetected {
 		log.Printf("[gfx_%s] ⚠️ GFX Extension not detected on page. Continuing anyway...", tool.WebsiteID)
@@ -83,103 +83,44 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
-	if !gfxSessionActive(page) {
-		for i := 0; i < 10; i++ {
-			if gfxSessionActive(page) {
-				break
-			}
-			time.Sleep(300 * time.Millisecond)
-		}
-	}
-	if !gfxSessionActive(page) {
+	// Dismiss non-auth dialogs only.
+	_, _ = page.Eval(`() => {
+		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
+		document.dispatchEvent(ev);
+		document.querySelectorAll('button[aria-label="Close"], button.close, [class*="close"], [class*="dismiss"]').forEach(b => {
+			try { b.click(); } catch(e) {}
+		});
+	}`)
+	time.Sleep(1 * time.Second)
+
+	if gfxGuestState(page) {
 		shot := saveErrorScreenshot(page, tool.WebsiteID, "not_logged_in")
-		msg := fmt.Sprintf("not logged in on tool page — login did not stick (account %s)", session.Slot().Account.WebsiteID)
+		msg := fmt.Sprintf("not logged in on tool page (account %s)", session.Slot().Account.WebsiteID)
 		if shot != "" {
 			msg += " | screenshot: " + shot
 		}
 		return fmt.Errorf("%s", msg)
 	}
 
-	// Dismiss non-auth dialogs only (after session confirmed).
-	_, _ = page.Eval(`() => {
-		document.querySelectorAll('button[aria-label="Close"], button.close, [class*="close"], [class*="dismiss"]').forEach(b => {
-			try { b.click(); } catch(e) {}
-		});
-	}`)
-	time.Sleep(500 * time.Millisecond)
-
 	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
-	btnFound := false
-	var btnSelectorClicked string
-	var useFallback bool
-	actualIndex := tool.FallbackIndex
-
-	for idxPoll := 0; idxPoll < 24; idxPoll++ {
-		hasBtn, _, _ := page.Has(tool.Selector)
-		if hasBtn {
-			btnFound = true
-			btnSelectorClicked = tool.Selector
-			break
-		}
-		resCheck, errCheck := page.Eval(`(idx) => {
-			const list = document.querySelectorAll('button[data-tool-cookie="true"]');
-			if (list.length > idx) return { found: true, actualIndex: idx };
-			if (list.length > 0) return { found: true, actualIndex: 0 };
-			return { found: false, actualIndex: -1 };
-		}`, tool.FallbackIndex)
-		if errCheck == nil && resCheck.Value.Get("found").Bool() {
-			btnFound = true
-			useFallback = true
-			actualIndex = resCheck.Value.Get("actualIndex").Int()
-			if actualIndex != tool.FallbackIndex {
-				log.Printf("[gfx_%s] ⚠️ Fallback index %d not available, falling back to index %d", tool.WebsiteID, tool.FallbackIndex, actualIndex)
-			}
-			break
-		}
-		resAccess, errAccess := page.Eval(`() => {
-			const pick = [...document.querySelectorAll('button,a,[role="button"]')].find(el => {
-				const t = (el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
-				return t.includes('access now') || t === 'access' || t.includes('get access') || t.includes('launch');
-			});
-			if (pick) { pick.setAttribute('data-gfx-access-btn','1'); return true; }
-			return false;
-		}`)
-		if errAccess == nil && resAccess.Value.Bool() {
-			btnFound = true
-			btnSelectorClicked = `[data-gfx-access-btn="1"]`
-			log.Printf("[gfx_%s] Found Access Now button", tool.WebsiteID)
-			break
-		}
-		if idxPoll == 4 && !btnFound {
-			log.Printf("[gfx_%s] Scrolling page to trigger lazy buttons...", tool.WebsiteID)
-			_, _ = page.Eval(`() => {
-				window.scrollTo(0, document.body.scrollHeight);
-				window.scrollTo(0, 0);
-			}`)
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-
-	if !btnFound {
+	hit, err := waitForAccessButton(page, tool, tool.WebsiteID)
+	if err != nil {
 		saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
-		// Dump buttons info to debug
 		resDebug, errDebug := page.Eval(`() => {
-			const btns = Array.from(document.querySelectorAll('button'));
-			return JSON.stringify(btns.map(b => ({
-				text: b.textContent,
-				tldr: b.getAttribute('data-tldr'),
+			const btns = Array.from(document.querySelectorAll('button,a,[role="button"]'));
+			return JSON.stringify(btns.slice(0, 40).map(b => ({
+				tag: b.tagName,
+				text: (b.textContent||'').trim().slice(0, 80),
 				cookie: b.getAttribute('data-tool-cookie'),
 				className: b.className
 			})));
 		}`)
 		if errDebug == nil {
 			log.Printf("[gfx_%s] Debug buttons on page: %s", tool.WebsiteID, resDebug.Value.Str())
-		} else {
-			log.Printf("[gfx_%s] Failed to dump debug buttons: %v", tool.WebsiteID, errDebug)
 		}
-		return fmt.Errorf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
+		return err
 	}
 
 	// Setup event listener to capture the new tab ID
@@ -194,27 +135,8 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 
 	// Click button to lease new tab and check return value
 	log.Printf("[gfx_%s] Clicking access button to open tool...", tool.WebsiteID)
-	resClick, err := page.Eval(`(sel, idx, useFB) => {
-		let btn;
-		if (useFB) {
-			btn = document.querySelectorAll('button[data-tool-cookie="true"]')[idx];
-		} else {
-			btn = document.querySelector(sel);
-		}
-		if (btn) {
-			btn.scrollIntoView({ block: 'center' });
-			btn.click();
-			return true;
-		}
-		return false;
-	}`, btnSelectorClicked, actualIndex, useFallback)
-
-	if err != nil {
-		return fmt.Errorf("failed to click access button: %w", err)
-	}
-	if !resClick.Value.Bool() {
-		saveErrorScreenshot(page, tool.WebsiteID, "click_failed")
-		return fmt.Errorf("SSO Access button click failed (selector: %s, fallback: %v)", btnSelectorClicked, useFallback)
+	if err := clickAccessButton(page, tool, hit, tool.WebsiteID); err != nil {
+		return err
 	}
 
 	log.Printf("[gfx_%s] Access button clicked successfully! Waiting for new tab context...", tool.WebsiteID)

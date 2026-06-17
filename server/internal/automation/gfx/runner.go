@@ -15,9 +15,6 @@ func Run(taskUID string) (status, msg string) {
 		return "failed", "unknown gfx task: " + taskUID
 	}
 
-	AcquireParallel()
-	defer ReleaseParallel()
-
 	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 	defer cancel()
 
@@ -29,6 +26,9 @@ func Run(taskUID string) (status, msg string) {
 	mu := ProfileLock(slot.Account.WebsiteID)
 	mu.Lock()
 	defer mu.Unlock()
+
+	AcquireParallel()
+	defer ReleaseParallel()
 
 	log.Printf("[GFX] Task %s → account %s profile %s", taskUID, slot.Account.WebsiteID, slot.ProfileDir)
 
