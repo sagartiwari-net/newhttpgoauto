@@ -102,51 +102,19 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	}`)
 	time.Sleep(150 * time.Millisecond)
 
-	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
-	btnFound := false
-	var btnSelectorClicked string
-	var useFallback bool
-	actualIndex := tool.FallbackIndex
+	settle := preOpenSettle(tool)
+	log.Printf("[gfx_%s] Waiting %s for tool page to render...", tool.WebsiteID, settle)
+	time.Sleep(settle)
+	log.Printf("[gfx_%s] Waiting for access button (selector: %s)", tool.WebsiteID, tool.Selector)
+	btnMatch := waitForAccessButton(page, tool)
 
-	for idxPoll := 0; idxPoll < 16; idxPoll++ {
-		hasBtn, _, _ := page.Has(tool.Selector)
-		if hasBtn {
-			btnFound = true
-			btnSelectorClicked = tool.Selector
-			break
-		}
-		resCheck, errCheck := page.Eval(`(idx) => {
-			const list = document.querySelectorAll('button[data-tool-cookie="true"]');
-			if (list.length > idx) return { found: true, actualIndex: idx };
-			if (list.length > 0) return { found: true, actualIndex: 0 };
-			return { found: false, actualIndex: -1 };
-		}`, tool.FallbackIndex)
-		if errCheck == nil && resCheck.Value.Get("found").Bool() {
-			btnFound = true
-			useFallback = true
-			actualIndex = resCheck.Value.Get("actualIndex").Int()
-			if actualIndex != tool.FallbackIndex {
-				log.Printf("[gfx_%s] ⚠️ Fallback index %d not available, falling back to index %d", tool.WebsiteID, tool.FallbackIndex, actualIndex)
-			}
-			break
-		}
-		if idxPoll == 4 && !btnFound {
-			log.Printf("[gfx_%s] Scrolling page to trigger lazy buttons...", tool.WebsiteID)
-			_, _ = page.Eval(`() => {
-				window.scrollTo(0, document.body.scrollHeight);
-				window.scrollTo(0, 0);
-			}`)
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-
-	if !btnFound {
+	if !btnMatch.found {
 		shot := saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
-		// Dump buttons info to debug
 		resDebug, errDebug := page.Eval(`() => {
-			const btns = Array.from(document.querySelectorAll('button'));
+			const btns = Array.from(document.querySelectorAll('button, a'));
 			return JSON.stringify(btns.map(b => ({
-				text: b.textContent,
+				tag: b.tagName,
+				text: (b.textContent||'').trim().slice(0, 80),
 				tldr: b.getAttribute('data-tldr'),
 				cookie: b.getAttribute('data-tool-cookie'),
 				className: b.className
@@ -154,8 +122,6 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		}`)
 		if errDebug == nil {
 			log.Printf("[gfx_%s] Debug buttons on page: %s", tool.WebsiteID, resDebug.Value.Str())
-		} else {
-			log.Printf("[gfx_%s] Failed to dump debug buttons: %v", tool.WebsiteID, errDebug)
 		}
 		msg := fmt.Sprintf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
 		if shot != "" {
@@ -176,26 +142,13 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 
 	// Click button to lease new tab and check return value
 	log.Printf("[gfx_%s] Clicking access button to open tool...", tool.WebsiteID)
-	resClick, err := page.Eval(`(sel, idx, useFB) => {
-		let btn;
-		if (useFB) {
-			btn = document.querySelectorAll('button[data-tool-cookie="true"]')[idx];
-		} else {
-			btn = document.querySelector(sel);
-		}
-		if (btn) {
-			btn.click();
-			return true;
-		}
-		return false;
-	}`, tool.Selector, actualIndex, useFallback)
-
+	clicked, err := clickAccessButton(page, btnMatch, tool)
 	if err != nil {
 		return fmt.Errorf("failed to click access button: %w", err)
 	}
-	if !resClick.Value.Bool() {
+	if !clicked {
 		saveErrorScreenshot(page, tool.WebsiteID, "click_failed")
-		return fmt.Errorf("SSO Access button click failed (selector: %s, fallback: %v)", btnSelectorClicked, useFallback)
+		return fmt.Errorf("SSO Access button click failed (selector: %s)", btnMatch.selector)
 	}
 
 	log.Printf("[gfx_%s] Access button clicked successfully! Waiting for new tab context...", tool.WebsiteID)
@@ -246,9 +199,9 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	// Attempt Cloudflare bypass if challenge is detected on target page
 	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
 
-	settle := preOpenSettle(tool)
-	log.Printf("[gfx_%s] Settle wait %s before capture...", tool.WebsiteID, settle)
-	time.Sleep(settle)
+	captureSettle := preOpenSettle(tool)
+	log.Printf("[gfx_%s] Settle wait %s before capture...", tool.WebsiteID, captureSettle)
+	time.Sleep(captureSettle)
 
 	// Intercept request cookies via CDP
 	_ = proto.NetworkEnable{}.Call(newPage)

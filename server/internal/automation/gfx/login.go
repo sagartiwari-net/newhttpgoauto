@@ -26,6 +26,10 @@ func gfxLoggedIn(page *rod.Page) bool {
 		}
 		if (document.querySelector('button[data-tool-cookie="true"]')) return true;
 		if (document.querySelector('[data-tool-cookie="true"]')) return true;
+		if (url.includes('/tools/')) {
+			const labels = Array.from(document.querySelectorAll('button,a')).map(el => (el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase());
+			if (labels.some(t => t.includes('access now') || t === 'access')) return true;
+		}
 		if (document.querySelector('a[href*="/tools/"]') && !body.includes('Sign in to continue')) return true;
 		return false;
 	}`)
