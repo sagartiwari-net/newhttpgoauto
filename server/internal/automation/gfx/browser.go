@@ -68,6 +68,10 @@ func (s *Session) Close() {
 		log.Printf("[GFX] Keeping browser open 45s for inspection (account=%s)", s.slot.Account.WebsiteID)
 		time.Sleep(45 * time.Second)
 	}
+	s.closeBrowser()
+}
+
+func (s *Session) closeBrowser() {
 	log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
 	if s.browser != nil {
 		_ = s.browser.Close()
@@ -76,6 +80,44 @@ func (s *Session) Close() {
 		s.cancel()
 	}
 	s.browser = nil
+}
+
+// Relaunch closes Chrome and starts a fresh instance with the same profile dir.
+// Call after credential login so the GFX extension loads with persisted session cookies.
+func (s *Session) Relaunch(ctx context.Context) error {
+	accountID := s.slot.Account.WebsiteID
+	log.Printf("[GFX] Relaunching Chrome after login (account=%s)", accountID)
+	s.closeBrowser()
+
+	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
+		_ = os.Remove(filepath.Join(s.slot.ProfileDir, lf))
+	}
+
+	extPath := extensionDir()
+	headless := os.Getenv("GFX_VISIBLE") != "1"
+	l := launcher.New().
+		Headless(headless).
+		Set("no-sandbox").
+		Set("disable-setuid-sandbox").
+		Set("disable-dev-shm-usage").
+		Set("disable-gpu").
+		Set("blink-settings", "imagesEnabled=false").
+		Set("disable-popup-blocking").
+		Set("disable-features", "IsolateOrigins,site-per-process").
+		Set("disable-blink-features", "AutomationControlled").
+		Set("disable-extensions-except", extPath).
+		Set("load-extension", extPath).
+		UserDataDir(s.slot.ProfileDir)
+
+	u, err := l.Launch()
+	if err != nil {
+		return err
+	}
+	sessCtx, cancel := context.WithCancel(ctx)
+	s.browser = rod.New().ControlURL(u).MustConnect().Context(sessCtx)
+	s.cancel = cancel
+	log.Printf("[GFX] Chrome relaunched (account=%s)", accountID)
+	return nil
 }
 
 func (s *Session) Browser() *rod.Browser { return s.browser }

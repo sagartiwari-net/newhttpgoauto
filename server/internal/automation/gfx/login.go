@@ -246,21 +246,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 	}
 
 	freshLogin = true
-	if startURL != "" && startURL != gfxSigninURL {
-		if err := stabilizeToolPageAfterLogin(ctx, page, startURL, accountID); err != nil {
-			return nil, true, err
-		}
-		if !gfxAccessButtonReady(page) {
-			shot := saveErrorScreenshot(page, accountID, "post_login_no_btn")
-			err := fmt.Errorf("access button not ready after fresh login for %s", accountID)
-			if shot != "" {
-				return nil, true, fmt.Errorf("%s | screenshot: %s", err.Error(), shot)
-			}
-			return nil, true, err
-		}
-	}
-
-	log.Printf("[gfx_%s] Login successful → %s", accountID, safeURL())
+	log.Printf("[gfx_%s] Credential login successful → %s (Chrome relaunch next)", accountID, safeURL())
 	return page, freshLogin, nil
 }
 

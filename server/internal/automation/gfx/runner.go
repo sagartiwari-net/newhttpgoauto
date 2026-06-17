@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const taskTimeout = 75 * time.Second
+const taskTimeout = 90 * time.Second
 
 // Run executes a GFX task with pool routing and parallel Chrome limits.
 func Run(taskUID string) (status, msg string) {
@@ -43,6 +43,23 @@ func Run(taskUID string) (status, msg string) {
 		gfxPage, freshLogin, err := ensureGFXLogin(ctx, session, tool.ToolURL)
 		if err != nil {
 			return "failed", "gfx login failed: " + err.Error()
+		}
+		if freshLogin {
+			log.Printf("[GFX] Relaunching Chrome after credential login (%s)", slot.Account.WebsiteID)
+			_ = gfxPage.Close()
+			if err := session.Relaunch(ctx); err != nil {
+				return "failed", "chrome relaunch after login failed: " + err.Error()
+			}
+			gfxPage = session.newPage()
+			if err := openToolPageAfterRelaunch(ctx, gfxPage, tool.ToolURL, slot.Account.WebsiteID); err != nil {
+				shot := saveErrorScreenshot(gfxPage, tool.WebsiteID, "relaunch_no_btn")
+				errMsg := err.Error()
+				if shot != "" {
+					errMsg += " | screenshot: " + shot
+				}
+				return "failed", errMsg
+			}
+			freshLogin = false
 		}
 		if err := runExtension(ctx, session, tool, gfxPage, freshLogin); err != nil {
 			return "failed", err.Error()

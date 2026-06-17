@@ -14,7 +14,7 @@ import (
 	"gohttpauto/internal/db"
 )
 
-const TaskRunTimeout = 70 * time.Second
+const TaskRunTimeout = 90 * time.Second
 
 var (
 	activeMu  sync.Mutex
@@ -126,7 +126,7 @@ func ExecuteWithTimeout(taskUID, automationType string) (status, msg string) {
 		return r.status, r.msg
 	case <-time.After(TaskRunTimeout):
 		log.Printf("⏱️ [QUEUE] %s timed out after %s", taskUID, TaskRunTimeout)
-		return "failed", "task timeout after 70 seconds"
+		return "failed", "task timeout after 90 seconds"
 	}
 }
 

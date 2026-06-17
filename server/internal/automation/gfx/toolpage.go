@@ -2,6 +2,7 @@ package gfx
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -20,62 +21,6 @@ func waitExtensionInject(page *rod.Page, polls int) bool {
 	return false
 }
 
-// stabilizeToolPageAfterLogin navigates to the tool page, reloads, and waits for the
-// GFX extension to inject access controls. Required after a fresh credential login —
-// cookie sessions usually already have buttons on the page.
-func stabilizeToolPageAfterLogin(ctx context.Context, page *rod.Page, toolURL, accountID string) error {
-	log.Printf("[gfx_%s] Preparing tool page after fresh login: %s", accountID, toolURL)
-
-	if err := page.Timeout(30 * time.Second).Navigate(toolURL); err != nil {
-		log.Printf("[gfx_%s] Tool page navigation warning: %v", accountID, err)
-	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	time.Sleep(2 * time.Second)
-
-	if waitExtensionInject(page, 20) {
-		log.Printf("[gfx_%s] Extension detected on tool page", accountID)
-	} else {
-		log.Printf("[gfx_%s] Extension not yet on tool page — will reload", accountID)
-	}
-
-	log.Printf("[gfx_%s] Reloading tool page so extension injects access button...", accountID)
-	_ = page.Timeout(30 * time.Second).Reload()
-	time.Sleep(2 * time.Second)
-	if waitExtensionInject(page, 16) {
-		log.Printf("[gfx_%s] Extension active after reload", accountID)
-	}
-	time.Sleep(2 * time.Second)
-
-	dismissNonAuthDialogs(page)
-	scrollPageForButtons(page)
-
-	for i := 0; i < 50; i++ {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if gfxAccessButtonReady(page) {
-			log.Printf("[gfx_%s] Access button ready after login (iter %d)", accountID, i)
-			return nil
-		}
-		if i == 8 || i == 24 {
-			scrollPageForButtons(page)
-		}
-		if i == 16 {
-			log.Printf("[gfx_%s] Still no access button — reloading tool page again", accountID)
-			_ = page.Timeout(30 * time.Second).Reload()
-			time.Sleep(2 * time.Second)
-			waitExtensionInject(page, 12)
-			time.Sleep(1500 * time.Millisecond)
-			dismissNonAuthDialogs(page)
-			scrollPageForButtons(page)
-		}
-		time.Sleep(400 * time.Millisecond)
-	}
-	return nil
-}
-
 func dismissNonAuthDialogs(page *rod.Page) {
 	_, _ = page.Eval(`() => {
 		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
@@ -84,6 +29,54 @@ func dismissNonAuthDialogs(page *rod.Page) {
 			try { b.click(); } catch(e) {}
 		});
 	}`)
+}
+
+// openToolPageAfterRelaunch opens the tool on a freshly relaunched browser (post-login cookies in profile).
+func openToolPageAfterRelaunch(ctx context.Context, page *rod.Page, toolURL, accountID string) error {
+	log.Printf("[gfx_%s] Opening tool page on relaunched browser: %s", accountID, toolURL)
+
+	if err := page.Timeout(45 * time.Second).Navigate(toolURL); err != nil {
+		log.Printf("[gfx_%s] Tool navigation warning: %v", accountID, err)
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	time.Sleep(2 * time.Second)
+
+	if waitExtensionInject(page, 24) {
+		log.Printf("[gfx_%s] Extension active on relaunched browser", accountID)
+	} else {
+		log.Printf("[gfx_%s] Extension not detected yet — reloading tool page", accountID)
+		_ = page.Timeout(30 * time.Second).Reload()
+		time.Sleep(2 * time.Second)
+		waitExtensionInject(page, 16)
+	}
+	time.Sleep(2 * time.Second)
+	dismissNonAuthDialogs(page)
+	scrollPageForButtons(page)
+
+	for i := 0; i < 45; i++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if gfxAccessButtonReady(page) {
+			log.Printf("[gfx_%s] Access button ready on relaunched browser (iter %d)", accountID, i)
+			return nil
+		}
+		if i == 6 || i == 20 {
+			scrollPageForButtons(page)
+		}
+		if i == 12 {
+			log.Printf("[gfx_%s] Reloading tool page on relaunched browser", accountID)
+			_ = page.Timeout(30 * time.Second).Reload()
+			time.Sleep(2 * time.Second)
+			waitExtensionInject(page, 12)
+			dismissNonAuthDialogs(page)
+			scrollPageForButtons(page)
+		}
+		time.Sleep(400 * time.Millisecond)
+	}
+	return fmt.Errorf("access button not ready after browser relaunch for %s", accountID)
 }
 
 // ensureAccessButtonOnToolPage reloads once when buttons are missing on an already-authed page.

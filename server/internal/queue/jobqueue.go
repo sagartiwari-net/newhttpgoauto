@@ -201,7 +201,7 @@ func StartQueueMaintenance() {
 			ExpireStaleJobs()
 		}
 	}()
-	log.Println("🧹 [QUEUE] Stale job cleanup started (70s run timeout)")
+	log.Println("🧹 [QUEUE] Stale job cleanup started (90s run timeout)")
 }
 
 // StartJobPoller runs on worker — picks pending jobs from MySQL and executes locally.
