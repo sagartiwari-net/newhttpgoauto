@@ -14,6 +14,11 @@
   <dict>
     <key>HOME</key>
     <string>__HOME__</string>
+    <!-- DEBUG: visible Chrome — remove GFX_VISIBLE / GFX_KEEP_OPEN when done checking -->
+    <key>GFX_VISIBLE</key>
+    <string>1</string>
+    <key>GFX_KEEP_OPEN</key>
+    <string>1</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
