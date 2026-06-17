@@ -83,18 +83,32 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	// Dismiss dialogs/modals
+	time.Sleep(2 * time.Second)
+
+	if !gfxSessionActive(page) {
+		for i := 0; i < 10; i++ {
+			if gfxSessionActive(page) {
+				break
+			}
+			time.Sleep(300 * time.Millisecond)
+		}
+	}
+	if !gfxSessionActive(page) {
+		shot := saveErrorScreenshot(page, tool.WebsiteID, "not_logged_in")
+		msg := fmt.Sprintf("not logged in on tool page — login did not stick (account %s)", session.Slot().Account.WebsiteID)
+		if shot != "" {
+			msg += " | screenshot: " + shot
+		}
+		return fmt.Errorf("%s", msg)
+	}
+
+	// Dismiss non-auth dialogs only (after session confirmed).
 	_, _ = page.Eval(`() => {
-		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
-		document.dispatchEvent(ev);
 		document.querySelectorAll('button[aria-label="Close"], button.close, [class*="close"], [class*="dismiss"]').forEach(b => {
 			try { b.click(); } catch(e) {}
 		});
 	}`)
-	time.Sleep(150 * time.Millisecond)
-
-	// Brief settle — tool card / Access Now button may render 1-2s after login redirect.
-	time.Sleep(2 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
 	btnFound := false
@@ -125,9 +139,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 			break
 		}
 		resAccess, errAccess := page.Eval(`() => {
-			const btn = [...document.querySelectorAll('button')].find(b =>
-				(b.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase().includes('access now'));
-			if (btn) { btn.setAttribute('data-gfx-access-btn','1'); return true; }
+			const pick = [...document.querySelectorAll('button,a,[role="button"]')].find(el => {
+				const t = (el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+				return t.includes('access now') || t === 'access' || t.includes('get access') || t.includes('launch');
+			});
+			if (pick) { pick.setAttribute('data-gfx-access-btn','1'); return true; }
 			return false;
 		}`)
 		if errAccess == nil && resAccess.Value.Bool() {
