@@ -6,7 +6,23 @@ import (
 	"sync"
 )
 
-var profileBusy sync.Map // account website_id -> struct{}
+var (
+	profileBusy sync.Map // account website_id -> struct{}
+	pollWake    = make(chan struct{}, 1)
+)
+
+// PollWake returns a channel notified when a profile becomes free.
+func PollWake() <-chan struct{} {
+	return pollWake
+}
+
+// ResetProfileGate clears in-memory profile locks (call on worker boot).
+func ResetProfileGate() {
+	profileBusy.Range(func(k, _ any) bool {
+		profileBusy.Delete(k)
+		return true
+	})
+}
 
 // AccountForTask resolves which GFX pool account (Chrome profile) a task uses.
 func AccountForTask(ctx context.Context, taskUID string) (string, error) {
@@ -32,7 +48,15 @@ func TryAcquireProfileBusy(accountID string) bool {
 	return !loaded
 }
 
-// ReleaseProfileBusy marks a profile free after a GFX job finishes.
+// ReleaseProfileBusy marks a profile free and wakes the job poller immediately.
 func ReleaseProfileBusy(accountID string) {
 	profileBusy.Delete(accountID)
+	notifyPollWake()
+}
+
+func notifyPollWake() {
+	select {
+	case pollWake <- struct{}{}:
+	default:
+	}
 }

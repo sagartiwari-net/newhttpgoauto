@@ -15,7 +15,7 @@ import (
 const (
 	stalePendingAfter    = 15 * time.Minute
 	queueMaintainEvery   = 15 * time.Second
-	queuePollInterval    = 100 * time.Millisecond
+	queuePollInterval    = 50 * time.Millisecond
 	workerHeartbeatKey   = "worker:heartbeat"
 	workerAliveWindow    = 90 * time.Second
 	workerHeartbeatEvery = 5 * time.Second
@@ -207,16 +207,37 @@ func StartQueueMaintenance() {
 // StartJobPoller runs on worker — picks pending jobs from MySQL and executes locally.
 func StartJobPoller() {
 	StartQueueMaintenance()
+	gfx.ResetProfileGate()
+	reconcileWorkerClaims()
 	go startWorkerHeartbeat()
 	go func() {
 		log.Printf("👂 [WORKER] Job poller started (%s interval, id=%s)", queuePollInterval, workerID())
 		pollOnce()
 		ticker := time.NewTicker(queuePollInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			pollOnce()
+		for {
+			select {
+			case <-ticker.C:
+				pollOnce()
+			case <-gfx.PollWake():
+				pollOnce()
+			}
 		}
 	}()
+}
+
+// reconcileWorkerClaims returns orphaned claimed rows to pending after worker restart.
+func reconcileWorkerClaims() {
+	res, err := db.DB.Exec(`
+		UPDATE job_queue SET status='pending', claimed_by=NULL, claimed_at=NULL
+		WHERE status='claimed' AND claimed_by=?`, workerID())
+	if err != nil {
+		log.Printf("⚠️ [WORKER] reconcile claims failed: %v", err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		log.Printf("🔄 [WORKER] Re-queued %d orphaned claimed job(s) after restart", n)
+	}
 }
 
 func startWorkerHeartbeat() {
@@ -262,16 +283,21 @@ func pollOnce() {
 		if gfx.IsProfileBusy(accountID) {
 			continue
 		}
+		if !gfx.TryAcquireProfileBusy(accountID) {
+			continue
+		}
 
 		res, err := db.DB.Exec(`
 			UPDATE job_queue SET status='claimed', claimed_by=?, claimed_at=NOW()
 			WHERE id=? AND status='pending'`, workerID(), id)
 		if err != nil {
+			gfx.ReleaseProfileBusy(accountID)
 			log.Printf("⚠️ [WORKER] claim job #%d failed: %v", id, err)
 			return
 		}
 		n, _ := res.RowsAffected()
 		if n == 0 {
+			gfx.ReleaseProfileBusy(accountID)
 			continue
 		}
 		log.Printf("▶️ [WORKER] Claimed job #%d: %s (profile %s, by %s)", id, taskUID, accountID, triggeredBy)
@@ -297,14 +323,6 @@ func runClaimedJob(id int, taskUID, triggeredBy, accountID string) {
 			_, _ = db.DB.Exec(`UPDATE job_queue SET status='failed', finished_at=NOW() WHERE id=?`, id)
 		}
 	}()
-
-	if !gfx.TryAcquireProfileBusy(accountID) {
-		log.Printf("⏸️ [WORKER] Profile %s busy — job #%d (%s) back to pending", accountID, id, taskUID)
-		_, _ = db.DB.Exec(`
-			UPDATE job_queue SET status='pending', claimed_by=NULL, claimed_at=NULL
-			WHERE id=? AND status='claimed'`, id)
-		return
-	}
 	defer gfx.ReleaseProfileBusy(accountID)
 
 	ok := RunSync(taskUID, triggeredBy)
