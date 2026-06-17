@@ -32,6 +32,15 @@ func profileDirForAccount(websiteID string) string {
 	return filepath.Join(dataRoot(), "profiles", "gfx", websiteID)
 }
 
+// profileDirForPortal is a separate Chrome profile (does not touch automation profiles).
+func profileDirForPortal(websiteID string) string {
+	return filepath.Join(dataRoot(), "profiles", "gfx-portal", websiteID)
+}
+
+func portalHomepageCookieFile() string {
+	return filepath.Join(cookiesBackupDir(), "gfx_portal_homepage.json")
+}
+
 func cookiesBackupDir() string {
 	return filepath.Join(dataRoot(), "cookies")
 }

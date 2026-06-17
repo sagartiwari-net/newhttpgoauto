@@ -60,6 +60,43 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	return &Session{slot: slot, browser: browser, cancel: cancel}, nil
 }
 
+// newPortalSession launches Chrome without the GFX extension (isolated portal profile).
+func newPortalSession(ctx context.Context, slot Slot) (*Session, error) {
+	if err := CheckProfileMeta(slot); err != nil {
+		log.Printf("[GFX] portal profile meta warning (%s): %v", slot.Account.WebsiteID, err)
+	}
+	_ = os.MkdirAll(slot.ProfileDir, 0755)
+	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
+		_ = os.Remove(filepath.Join(slot.ProfileDir, lf))
+	}
+
+	headless := os.Getenv("GFX_VISIBLE") != "1"
+	log.Printf("[GFX] Launching portal Chrome account=%s headless=%v profile=%s (no extension)",
+		slot.Account.WebsiteID, headless, slot.ProfileDir)
+
+	l := launcher.New().
+		Headless(headless).
+		Set("no-sandbox").
+		Set("disable-setuid-sandbox").
+		Set("disable-dev-shm-usage").
+		Set("disable-gpu").
+		Set("blink-settings", "imagesEnabled=false").
+		Set("disable-popup-blocking").
+		Set("disable-features", "IsolateOrigins,site-per-process").
+		Set("disable-blink-features", "AutomationControlled").
+		UserDataDir(slot.ProfileDir)
+
+	u, err := l.Launch()
+	if err != nil {
+		return nil, err
+	}
+
+	sessCtx, cancel := context.WithCancel(ctx)
+	browser := rod.New().ControlURL(u).MustConnect().Context(sessCtx)
+	logGFXNetworkFilterOnce()
+	return &Session{slot: slot, browser: browser, cancel: cancel}, nil
+}
+
 func (s *Session) Close() {
 	if s == nil {
 		return

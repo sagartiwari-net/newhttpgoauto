@@ -21,18 +21,35 @@ func Run(taskUID string) (status, msg string) {
 	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 	defer cancel()
 
-	slot, err := ResolveSlot(ctx, taskUID)
-	if err != nil {
-		return "failed", err.Error()
+	var slot Slot
+	var err error
+	lockKey := ""
+	if tool.Kind == KindPortalHome {
+		slot, err = ResolvePortalSlot(ctx, taskUID)
+		if err != nil {
+			return "failed", err.Error()
+		}
+		lockKey = "portal-" + slot.Account.WebsiteID
+	} else {
+		slot, err = ResolveSlot(ctx, taskUID)
+		if err != nil {
+			return "failed", err.Error()
+		}
+		lockKey = slot.Account.WebsiteID
 	}
 
-	mu := ProfileLock(slot.Account.WebsiteID)
+	mu := ProfileLock(lockKey)
 	mu.Lock()
 	defer mu.Unlock()
 
 	log.Printf("[GFX] Task %s → account %s profile %s", taskUID, slot.Account.WebsiteID, slot.ProfileDir)
 
-	session, err := newSession(ctx, slot)
+	var session *Session
+	if tool.Kind == KindPortalHome {
+		session, err = newPortalSession(ctx, slot)
+	} else {
+		session, err = newSession(ctx, slot)
+	}
 	if err != nil {
 		return "failed", "chrome launch failed: " + err.Error()
 	}
@@ -48,7 +65,15 @@ func Run(taskUID string) (status, msg string) {
 			return "failed", err.Error()
 		}
 		return "success", tool.Name + " session captured (" + slot.Account.WebsiteID + ")"
+	case KindPortalHome:
+		if err := runPortalHomepage(ctx, session, tool); err != nil {
+			return "failed", err.Error()
+		}
+		return "success", "GFX homepage cookies saved locally (" + slot.Account.WebsiteID + ")"
 	case KindCredFetch:
+		if _, err := ensureGFXLogin(ctx, session, ""); err != nil {
+			return "failed", "gfx login failed: " + err.Error()
+		}
 		if err := runCredScraper(ctx, session, tool); err != nil {
 			return "failed", err.Error()
 		}

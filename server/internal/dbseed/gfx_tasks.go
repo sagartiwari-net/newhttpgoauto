@@ -2,6 +2,7 @@ package dbseed
 
 // GFXTasks seeded from goauto registry (auto-generated).
 var GFXTasks = []TaskDef{
+	{UID: "gfx_captureHomepage", Name: "GFX Portal Homepage (local cookies)", Group: "gfx", AutomationType: "chrome_portal", IntervalMin: 60},
 	{UID: "gfx_oneclick_runVecteezy", Name: "Vecteezy (GFX OneClick)", Group: "gfx", AutomationType: "chrome_extension", IntervalMin: 60},
 	{UID: "gfx_runAirbrush", Name: "Airbrush AI (GFX)", Group: "gfx", AutomationType: "chrome_extension", IntervalMin: 60},
 	{UID: "gfx_runAnswerthepublic", Name: "AnswerThePublic (GFX)", Group: "gfx", AutomationType: "chrome_extension", IntervalMin: 60},

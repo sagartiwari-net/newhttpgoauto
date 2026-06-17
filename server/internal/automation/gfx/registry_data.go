@@ -1149,5 +1149,12 @@ func initRegistry() {
 	"gfx_scrapePodcastleAI": {TaskUID: "gfx_scrapePodcastleAI", Kind: KindCredFetch, ScrapeName: "Podcastle Ai", ToolURL: "https://app.gfxtoolz.ai/tools/podcastle-ai"},
 	"gfx_scrapeSlidebeans": {TaskUID: "gfx_scrapeSlidebeans", Kind: KindCredFetch, ScrapeName: "Slidebeans", ToolURL: "https://app.gfxtoolz.ai/tools/slidebeans"},
 	"gfx_scrapeToonsAI": {TaskUID: "gfx_scrapeToonsAI", Kind: KindCredFetch, ScrapeName: "Toons AI", ToolURL: "https://app.gfxtoolz.ai/tools/toons-ai"},
+	"gfx_captureHomepage": {
+		TaskUID:    "gfx_captureHomepage",
+		Kind:       KindPortalHome,
+		Name:       "GFX Portal Homepage",
+		WebsiteID:  "gfxtoolz_portal",
+		BackupFile: "gfx_portal_homepage.json",
+	},
 	}
 }

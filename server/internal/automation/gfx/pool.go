@@ -103,6 +103,25 @@ func ResolveSlot(ctx context.Context, taskUID string) (Slot, error) {
 	}, nil
 }
 
+// ResolvePortalSlot picks pool credentials but uses an isolated Chrome profile for portal capture.
+func ResolvePortalSlot(ctx context.Context, taskUID string) (Slot, error) {
+	accounts, err := LoadPoolAccounts(ctx)
+	if err != nil {
+		return Slot{}, err
+	}
+	if len(accounts) == 0 {
+		return Slot{}, fmt.Errorf("no enabled GFX accounts (add gfxtoolz_1, gfxtoolz_2, … in credentials)")
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(taskUID))
+	idx := int(h.Sum32()) % len(accounts)
+	acc := accounts[idx]
+	return Slot{
+		Account:    acc,
+		ProfileDir: profileDirForPortal(acc.WebsiteID),
+	}, nil
+}
+
 // CheckProfileMeta wipes profile if bound username changed in DB.
 func CheckProfileMeta(slot Slot) error {
 	metaPath := profileMetaPath(slot.ProfileDir)
