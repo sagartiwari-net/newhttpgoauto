@@ -18,18 +18,11 @@ import (
 
 const TaskRunTimeout = 70 * time.Second
 
-// MaxTaskRunTimeout is used for stale-job cleanup (longest per-task limit).
-const MaxTaskRunTimeout = 120 * time.Second
-
-var portalHomepageTasks = map[string]bool{
-	"gfx_captureHomepage": true,
-}
+// MaxTaskRunTimeout is used for stale-job cleanup.
+const MaxTaskRunTimeout = 70 * time.Second
 
 // TaskRunTimeoutFor returns the wall-clock limit for a task UID.
 func TaskRunTimeoutFor(taskUID string) time.Duration {
-	if portalHomepageTasks[taskUID] {
-		return MaxTaskRunTimeout
-	}
 	return TaskRunTimeout
 }
 

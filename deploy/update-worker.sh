@@ -27,6 +27,3 @@ launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || {
 }
 
 echo "==> Done. Worker updated from $(git -C "$APP_DIR" rev-parse --short HEAD)"
-if grep -q '<key>GFX_VISIBLE</key>' "$PLIST_DIR/com.gohttpauto.worker.plist" 2>/dev/null; then
-  echo "   GFX_VISIBLE=1 (Chrome window will show during GFX tasks)"
-fi

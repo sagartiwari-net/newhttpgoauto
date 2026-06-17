@@ -15,10 +15,9 @@ import (
 
 // Session is one Chrome + GFX extension run for a pool account profile.
 type Session struct {
-	slot       Slot
-	browser    *rod.Browser
-	cancel     context.CancelFunc
-	portalMode bool // portal homepage capture: no image block, no network filter
+	slot    Slot
+	browser *rod.Browser
+	cancel  context.CancelFunc
 }
 
 func newSession(ctx context.Context, slot Slot) (*Session, error) {
@@ -31,7 +30,6 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	}
 
 	extPath := extensionDir()
-	// Headless by default for speed; set GFX_VISIBLE=1 on the worker to show Chrome for debugging.
 	headless := os.Getenv("GFX_VISIBLE") != "1"
 	log.Printf("[GFX] Launching Chrome account=%s headless=%v profile=%s ext=%s",
 		slot.Account.WebsiteID, headless, slot.ProfileDir, extPath)
@@ -61,50 +59,8 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	return &Session{slot: slot, browser: browser, cancel: cancel}, nil
 }
 
-// newPortalSession launches Chrome without the GFX extension (isolated portal profile).
-func newPortalSession(ctx context.Context, slot Slot) (*Session, error) {
-	if err := CheckProfileMeta(slot); err != nil {
-		log.Printf("[GFX] portal profile meta warning (%s): %v", slot.Account.WebsiteID, err)
-	}
-	_ = os.MkdirAll(slot.ProfileDir, 0755)
-	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
-		_ = os.Remove(filepath.Join(slot.ProfileDir, lf))
-	}
-
-	headless := os.Getenv("GFX_VISIBLE") != "1"
-	log.Printf("[GFX] Launching portal Chrome account=%s headless=%v profile=%s (no extension)",
-		slot.Account.WebsiteID, headless, slot.ProfileDir)
-
-	// Portal capture needs full page load (no image blocking) so client auth state hydrates.
-	l := launcher.New().
-		Headless(headless).
-		Set("no-sandbox").
-		Set("disable-setuid-sandbox").
-		Set("disable-dev-shm-usage").
-		Set("disable-gpu").
-		Set("disable-popup-blocking").
-		Set("disable-features", "IsolateOrigins,site-per-process").
-		Set("disable-blink-features", "AutomationControlled").
-		UserDataDir(slot.ProfileDir)
-
-	u, err := l.Launch()
-	if err != nil {
-		return nil, err
-	}
-
-	sessCtx, cancel := context.WithCancel(ctx)
-	browser := rod.New().ControlURL(u).MustConnect().Context(sessCtx)
-	return &Session{slot: slot, browser: browser, cancel: cancel, portalMode: true}, nil
-}
-
 func (s *Session) Close() {
 	if s == nil {
-		return
-	}
-	// Portal homepage: leave Chrome open until the user closes the window manually.
-	if s.portalMode && (os.Getenv("GFX_PORTAL_MANUAL_CLOSE") == "1" || os.Getenv("GFX_KEEP_OPEN") == "1") {
-		log.Printf("[GFX] Portal Chrome left open — close the browser window manually when done (account=%s)", s.slot.Account.WebsiteID)
-		s.browser = nil
 		return
 	}
 	if os.Getenv("GFX_KEEP_OPEN") == "1" {
@@ -126,9 +82,7 @@ func (s *Session) Slot() Slot            { return s.slot }
 
 func (s *Session) newPage() *rod.Page {
 	page := stealth.MustPage(s.browser)
-	if !s.portalMode {
-		attachGFXNetworkFilter(page)
-	}
+	attachGFXNetworkFilter(page)
 	page.MustSetViewport(1920, 1080, 1, false)
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

@@ -6,7 +6,6 @@ type Kind string
 const (
 	KindExtension   Kind = "extension"    // Chrome + GFX extension cookie capture
 	KindCredFetch   Kind = "cred_fetch"   // Scrape username/password from GFX portal
-	KindPortalHome  Kind = "portal_home"  // GFX homepage session → local file only
 	KindOneClick    Kind = "oneclick"     // Future: no extension (e.g. Vecteezy)
 )
 

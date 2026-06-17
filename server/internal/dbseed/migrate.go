@@ -17,4 +17,11 @@ func EnsureSchema() {
 	} else {
 		log.Println("🌱 [DB] tasks.automation_type includes chrome_portal")
 	}
+
+	res, err := db.DB.Exec(`DELETE FROM tasks WHERE task_uid='gfx_captureHomepage'`)
+	if err != nil {
+		log.Printf("⚠️ [DB] remove gfx_captureHomepage: %v", err)
+	} else if n, _ := res.RowsAffected(); n > 0 {
+		log.Println("🌱 [DB] Removed gfx_captureHomepage task")
+	}
 }
