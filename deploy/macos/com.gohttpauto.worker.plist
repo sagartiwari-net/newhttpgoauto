@@ -15,6 +15,10 @@
   <dict>
     <key>HOME</key>
     <string>__HOME__</string>
+    <key>ROLE</key>
+    <string>worker</string>
+    <key>ENABLE_SCHEDULER</key>
+    <string>false</string>
     <key>GFX_VISIBLE</key>
     <string>1</string>
   </dict>
