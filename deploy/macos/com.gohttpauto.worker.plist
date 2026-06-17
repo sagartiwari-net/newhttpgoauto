@@ -19,6 +19,8 @@
     <string>1</string>
     <key>GFX_KEEP_OPEN</key>
     <string>1</string>
+    <key>GFX_PORTAL_MANUAL_CLOSE</key>
+    <string>1</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

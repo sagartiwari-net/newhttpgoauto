@@ -101,6 +101,12 @@ func (s *Session) Close() {
 	if s == nil {
 		return
 	}
+	// Portal homepage: leave Chrome open until the user closes the window manually.
+	if s.portalMode && (os.Getenv("GFX_PORTAL_MANUAL_CLOSE") == "1" || os.Getenv("GFX_KEEP_OPEN") == "1") {
+		log.Printf("[GFX] Portal Chrome left open — close the browser window manually when done (account=%s)", s.slot.Account.WebsiteID)
+		s.browser = nil
+		return
+	}
 	if os.Getenv("GFX_KEEP_OPEN") == "1" {
 		log.Printf("[GFX] Keeping browser open 45s for inspection (account=%s)", s.slot.Account.WebsiteID)
 		time.Sleep(45 * time.Second)

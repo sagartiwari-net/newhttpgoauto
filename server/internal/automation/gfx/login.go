@@ -59,6 +59,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		u := safeURL()
 		if u != "" && !strings.Contains(u, "signin") {
 			log.Printf("[gfx_%s] Already logged in (%s)", slot.Account.WebsiteID, u)
+			exportPortalSeedCookies(page, accountID)
 			return page, nil
 		}
 		hasEmail, _, _ := page.Has("input[type='email']")
@@ -77,6 +78,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 	u := safeURL()
 	if u != "" && !strings.Contains(u, "signin") {
 		log.Printf("[gfx_%s] Already logged in", slot.Account.WebsiteID)
+		exportPortalSeedCookies(page, accountID)
 		return page, nil
 	}
 
@@ -165,5 +167,6 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 	}
 
 	log.Printf("[gfx_%s] Login successful", slot.Account.WebsiteID)
+	exportPortalSeedCookies(page, accountID)
 	return page, nil
 }
