@@ -40,11 +40,11 @@ func Run(taskUID string) (status, msg string) {
 
 	switch tool.Kind {
 	case KindExtension:
-		gfxPage, err := ensureGFXLogin(ctx, session, tool.ToolURL)
+		gfxPage, freshLogin, err := ensureGFXLogin(ctx, session, tool.ToolURL)
 		if err != nil {
 			return "failed", "gfx login failed: " + err.Error()
 		}
-		if err := runExtension(ctx, session, tool, gfxPage); err != nil {
+		if err := runExtension(ctx, session, tool, gfxPage, freshLogin); err != nil {
 			return "failed", err.Error()
 		}
 		return "success", tool.Name + " session captured (" + slot.Account.WebsiteID + ")"

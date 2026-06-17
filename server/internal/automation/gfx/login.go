@@ -50,12 +50,14 @@ func gfxGuestState(page *rod.Page) bool {
 }
 
 // ensureGFXLogin opens the tool page, logs in if needed, leaves page ready for access button.
-func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*rod.Page, error) {
+// The bool return is true when credentials were used (fresh login) vs an existing cookie session.
+func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*rod.Page, bool, error) {
 	page := session.newPage()
 	slot := session.Slot()
 	username := slot.Account.Username
 	password := slot.Account.Password
 	accountID := slot.Account.WebsiteID
+	freshLogin := false
 
 	if startURL == "" {
 		startURL = gfxSigninURL
@@ -87,17 +89,17 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		log.Printf("[gfx_%s] Navigation warning: %v", accountID, err)
 	}
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return nil, false, ctx.Err()
 	}
 
 	// Wait for React — do NOT trust URL-only "already logged in" on empty/loading page.
 	for i := 0; i < 30; i++ {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
 		}
 		if gfxSessionActive(page) {
 			log.Printf("[gfx_%s] Session active (%s)", accountID, safeURL())
-			return page, nil
+			return page, false, nil
 		}
 		title := safeTitle()
 		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
@@ -116,7 +118,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 	}
 
 	if gfxSessionActive(page) {
-		return page, nil
+		return page, false, nil
 	}
 
 	if !strings.Contains(safeURL(), "signin") {
@@ -126,7 +128,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 
 	for i := 0; i < 40; i++ {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
 		}
 		if gfxSessionActive(page) {
 			break
@@ -150,7 +152,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 			_ = page.Timeout(30 * time.Second).Navigate(startURL)
 			waitSessionOnToolPage(ctx, page, accountID)
 		}
-		return page, nil
+		return page, false, nil
 	}
 
 	log.Printf("[gfx_%s] Logging in with credentials...", accountID)
@@ -169,7 +171,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		return true;
 	}`, username, password)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fill credentials: %w", err)
+		return nil, false, fmt.Errorf("failed to fill credentials: %w", err)
 	}
 	if filled != nil && !filled.Value.Bool() {
 		shot := saveErrorScreenshot(page, accountID, "login_form_missing")
@@ -177,7 +179,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		if shot != "" {
 			msg += " | screenshot: " + shot
 		}
-		return nil, fmt.Errorf("%s", msg)
+		return nil, false, fmt.Errorf("%s", msg)
 	}
 
 	_, _ = page.Eval(`() => {
@@ -191,7 +193,12 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 	showDeviceLimit := false
 	for i := 0; i < 40; i++ {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
+		}
+		urlNow := safeURL()
+		if urlNow != "" && !strings.Contains(urlNow, "signin") {
+			loggedIn = true
+			break
 		}
 		if gfxSessionActive(page) {
 			loggedIn = true
@@ -235,22 +242,26 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		if shot != "" {
 			errMsg += " | screenshot: " + shot
 		}
-		return nil, fmt.Errorf("%s", errMsg)
+		return nil, false, fmt.Errorf("%s", errMsg)
 	}
 
+	freshLogin = true
 	if startURL != "" && startURL != gfxSigninURL {
-		_ = page.Timeout(30 * time.Second).Navigate(startURL)
-		if err := waitSessionOnToolPage(ctx, page, accountID); err != nil {
-			shot := saveErrorScreenshot(page, accountID, "post_login_guest")
+		if err := stabilizeToolPageAfterLogin(ctx, page, startURL, accountID); err != nil {
+			return nil, true, err
+		}
+		if !gfxAccessButtonReady(page) {
+			shot := saveErrorScreenshot(page, accountID, "post_login_no_btn")
+			err := fmt.Errorf("access button not ready after fresh login for %s", accountID)
 			if shot != "" {
-				return nil, fmt.Errorf("%s | screenshot: %s", err.Error(), shot)
+				return nil, true, fmt.Errorf("%s | screenshot: %s", err.Error(), shot)
 			}
-			return nil, err
+			return nil, true, err
 		}
 	}
 
 	log.Printf("[gfx_%s] Login successful → %s", accountID, safeURL())
-	return page, nil
+	return page, freshLogin, nil
 }
 
 func waitSessionOnToolPage(ctx context.Context, page *rod.Page, accountID string) error {

@@ -16,7 +16,7 @@ func runCredScraper(ctx context.Context, session *Session, tool ToolDef) error {
 	log.Printf("[GFX] Cred scrape %s (%s)", tool.ScrapeName, tool.ToolURL)
 	page := session.newPage()
 
-	if _, err := ensureGFXLogin(ctx, session, ""); err != nil {
+	if _, _, err := ensureGFXLogin(ctx, session, ""); err != nil {
 		return err
 	}
 

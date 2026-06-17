@@ -44,8 +44,11 @@ func postReloadSettle(tool ToolDef) time.Duration {
 	return 4 * time.Second
 }
 
-func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *rod.Page) error {
+func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *rod.Page, freshLogin bool) error {
 	log.Printf("🏁 [gfx_%s] Starting GFX %s automation...", tool.WebsiteID, tool.Name)
+	if freshLogin {
+		log.Printf("[gfx_%s] Fresh credential login — tool page already stabilized", tool.WebsiteID)
+	}
 
 	var page *rod.Page
 	if gfxPage != nil {
@@ -83,16 +86,13 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	time.Sleep(3 * time.Second)
+	if freshLogin {
+		time.Sleep(1 * time.Second)
+	} else {
+		time.Sleep(3 * time.Second)
+	}
 
-	// Dismiss non-auth dialogs only.
-	_, _ = page.Eval(`() => {
-		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
-		document.dispatchEvent(ev);
-		document.querySelectorAll('button[aria-label="Close"], button.close, [class*="close"], [class*="dismiss"]').forEach(b => {
-			try { b.click(); } catch(e) {}
-		});
-	}`)
+	dismissNonAuthDialogs(page)
 	time.Sleep(1 * time.Second)
 
 	if gfxGuestState(page) {
@@ -103,6 +103,8 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		}
 		return fmt.Errorf("%s", msg)
 	}
+
+	ensureAccessButtonOnToolPage(ctx, page, tool, session.Slot().Account.WebsiteID)
 
 	log.Printf("[gfx_%s] Waiting for access button to render: %s", tool.WebsiteID, tool.Selector)
 	hit, err := waitForAccessButton(page, tool, tool.WebsiteID)
