@@ -11,10 +11,10 @@ import (
 )
 
 type loginAPIResult struct {
-	mu      sync.Mutex
-	Status  int
-	Body    string
-	Seen    bool
+	mu     sync.Mutex
+	Status int
+	Body   string
+	Seen   bool
 }
 
 func (r *loginAPIResult) set(status int, body string) {
@@ -32,26 +32,31 @@ func (r *loginAPIResult) snapshot() (status int, body string, seen bool) {
 }
 
 // watchGFXLoginAPI records the GFX auth/login API response (status + body).
+// stop() cancels the listener; it must not block (EachEvent wait() blocks forever unless the callback returns true).
 func watchGFXLoginAPI(page *rod.Page) (stop func(), result *loginAPIResult) {
 	result = &loginAPIResult{}
-	_ = proto.NetworkEnable{}.Call(page)
+	watchPage, cancel := page.WithCancel()
+	_ = proto.NetworkEnable{}.Call(watchPage)
 
-	wait := page.EachEvent(func(e *proto.NetworkResponseReceived) {
-		if !strings.Contains(e.Response.URL, "/api/v1/auth/login") {
-			return
-		}
-		status := e.Response.Status
-		reqID := e.RequestID
-		go func() {
-			body := ""
-			res, err := proto.NetworkGetResponseBody{RequestID: reqID}.Call(page)
-			if err == nil {
-				body = res.Body
+	go func() {
+		watchPage.EachEvent(func(e *proto.NetworkResponseReceived) {
+			if !strings.Contains(e.Response.URL, "/api/v1/auth/login") {
+				return
 			}
-			result.set(status, body)
-		}()
-	})
-	return wait, result
+			status := e.Response.Status
+			reqID := e.RequestID
+			go func() {
+				body := ""
+				res, err := proto.NetworkGetResponseBody{RequestID: reqID}.Call(watchPage)
+				if err == nil {
+					body = res.Body
+				}
+				result.set(status, body)
+			}()
+		})()
+	}()
+
+	return cancel, result
 }
 
 func readPageLoginError(page *rod.Page) string {

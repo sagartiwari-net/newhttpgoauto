@@ -171,7 +171,6 @@ func ensureGFXLogin(ctx context.Context, session *Session, _ string) (*rod.Page,
 
 	log.Printf("[gfx_%s] Step 2: filling credentials...", accountID)
 	stopWatch, loginAPI := watchGFXLoginAPI(page)
-	defer stopWatch()
 
 	filled, err := page.Eval(`(u, p) => {
 		const loginEl = document.querySelector('input[type="email"]');
@@ -185,9 +184,11 @@ func ensureGFXLogin(ctx context.Context, session *Session, _ string) (*rod.Page,
 		return true;
 	}`, username, password)
 	if err != nil {
+		stopWatch()
 		return nil, false, fmt.Errorf("failed to fill credentials: %w", err)
 	}
 	if filled != nil && !filled.Value.Bool() {
+		stopWatch()
 		return nil, false, fmt.Errorf("failed to fill credentials for %s", accountID)
 	}
 
@@ -248,6 +249,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, _ string) (*rod.Page,
 	}
 
 	if !loggedIn {
+		stopWatch()
 		pageErr := readPageLoginError(page)
 		shot := saveErrorScreenshot(page, accountID, "signin_failed")
 		errMsg := formatGFXLoginFailure(accountID, loginAPI, pageErr)
@@ -258,6 +260,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, _ string) (*rod.Page,
 	}
 
 	log.Printf("[gfx_%s] Step 3: credential login OK → %s (Chrome relaunch next)", accountID, safeURL())
+	stopWatch()
 	return page, true, nil
 }
 
