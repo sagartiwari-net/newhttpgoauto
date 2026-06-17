@@ -26,7 +26,7 @@ func waitForToolPage(ctx context.Context, browser *rod.Browser, portalPage *rod.
 	portalID := portalPage.TargetID
 	log.Printf("[gfx_%s] Waiting for tool page (%s)...", tool.WebsiteID, refererHost)
 
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 24; i++ {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}

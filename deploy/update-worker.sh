@@ -13,7 +13,7 @@ echo "==> Building worker..."
 cd "$APP_DIR/server"
 go build -buildvcs=false -o gohttpauto ./cmd
 
-echo "==> Refreshing worker launchd plist (GFX_VISIBLE=1 for debugging)..."
+echo "==> Refreshing worker launchd plist (headless GFX)..."
 MACOS="$APP_DIR/deploy/macos"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 mkdir -p "$PLIST_DIR" "$HOME/Library/Logs/gohttpauto" "$HOME/Desktop/screenshot/gfx"
@@ -24,9 +24,8 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.worker.plist"
 echo "==> Restarting worker service..."
 launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || {
   echo "!! launchctl kickstart failed — start manually:"
-  echo "   cd $APP_DIR/server && GFX_VISIBLE=1 GFX_KEEP_OPEN=1 ./gohttpauto"
+  echo "   cd $APP_DIR/server && ./gohttpauto"
 }
 
 echo "==> Done. Worker updated from $(git -C "$APP_DIR" rev-parse --short HEAD)"
-echo "    Screenshots on fail → $HOME/Desktop/screenshot/gfx/<tool>/"
-echo "    Chrome visible for GFX tasks (GFX_VISIBLE=1)"
+echo "    GFX runs headless — failure screenshots → $HOME/Desktop/screenshot/gfx/"

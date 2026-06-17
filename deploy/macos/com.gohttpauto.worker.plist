@@ -14,10 +14,6 @@
   <dict>
     <key>HOME</key>
     <string>__HOME__</string>
-    <key>GFX_VISIBLE</key>
-    <string>1</string>
-    <key>GFX_KEEP_OPEN</key>
-    <string>1</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

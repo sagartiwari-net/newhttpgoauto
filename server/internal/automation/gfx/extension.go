@@ -22,7 +22,7 @@ import (
 func preOpenSettle(tool ToolDef) time.Duration {
 	switch tool.WebsiteID {
 	case "airbrush":
-		return 7 * time.Second
+		return 3 * time.Second
 	}
 	if tool.SkipPageReload {
 		return 6 * time.Second
@@ -36,7 +36,7 @@ func preOpenSettle(tool ToolDef) time.Duration {
 func postReloadSettle(tool ToolDef) time.Duration {
 	switch tool.WebsiteID {
 	case "airbrush":
-		return 5 * time.Second
+		return 2 * time.Second
 	}
 	if tool.CaptureLocalStorage {
 		return 4 * time.Second
@@ -180,6 +180,16 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	rootDomain := strings.Join(parts, ".")
 	log.Printf("[gfx_%s] Root domain for cookies: %s", tool.WebsiteID, rootDomain)
 
+	// GFX extension injects session into the tool tab — wait before capture (goauto uses ~8s for airbrush).
+	if tool.CaptureLocalStorage {
+		injectWait := 4 * time.Second
+		if tool.WebsiteID == "airbrush" {
+			injectWait = 5 * time.Second
+		}
+		log.Printf("[gfx_%s] Waiting %s for extension session inject...", tool.WebsiteID, injectWait)
+		time.Sleep(injectWait)
+	}
+
 	if tool.SkipPageReload {
 		if err := captureSessionFast(ctx, newPage, tool, rootDomain, page, browser, dataDir); err != nil {
 			log.Printf("[gfx_%s] Fast capture incomplete (%v) — falling back to reload capture", tool.WebsiteID, err)
@@ -189,13 +199,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	}
 
 	// Attempt Cloudflare bypass if challenge is detected on target page
-	handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
+	if tool.WebsiteID != "airbrush" {
+		handleTargetPageCloudflare(ctx, newPage, tool.WebsiteID, rootDomain)
+	}
 
-	captureSettle := preOpenSettle(tool)
-	log.Printf("[gfx_%s] Settle wait %s before capture...", tool.WebsiteID, captureSettle)
-	time.Sleep(captureSettle)
-
-	// Intercept request cookies via CDP
+	// Intercept request cookies via CDP (must be enabled before reload)
 	_ = proto.NetworkEnable{}.Call(newPage)
 
 	var capturedCookieHeader string
@@ -267,8 +275,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 
 	headerPolls := 10
 	headerInterval := 500 * time.Millisecond
-	if len(tool.SessionCookieNames) > 0 || tool.WebsiteID == "airbrush" {
-		headerPolls = 15
+	if tool.WebsiteID == "airbrush" {
+		headerPolls = 10
+		headerInterval = 500 * time.Millisecond
+	} else if len(tool.SessionCookieNames) > 0 {
+		headerPolls = 12
 		headerInterval = 1 * time.Second
 	}
 	for i := 0; i < headerPolls; i++ {
@@ -412,10 +423,19 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		cookieHeaderString = strings.Join(pairs, "; ")
 	}
 
-	// Close tool tabs before DB save so Chrome shuts down faster after task ends.
+	if tool.WebsiteID == "airbrush" && !airbrushSessionReady(rawCookies, localStorageData) {
+		saveErrorScreenshot(newPage, tool.WebsiteID, "no_session_reload")
+		return fmt.Errorf("airbrush session not ready after capture (no loginSet cookie or firebase auth)")
+	}
+
+	// Close tool tabs after capture data is in memory.
 	closeGFXPages(browser, page, newPage)
 
-	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, indexedDBData, cookieHeaderString)
+	if err := saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, indexedDBData, cookieHeaderString); err != nil {
+		return err
+	}
+	log.Printf("[gfx_%s] ✅ DB + webhook updated for %s", tool.WebsiteID, tool.WebsiteID)
+	return nil
 }
 
 func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, rootDomain string, gfxPage *rod.Page, browser *rod.Browser, dataDir string) error {
@@ -463,7 +483,11 @@ func captureSessionFast(ctx context.Context, newPage *rod.Page, tool ToolDef, ro
 	}
 
 	closeGFXPages(browser, gfxPage, newPage)
-	return saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString)
+	if err := saveCapturedSession(ctx, tool, dataDir, rootDomain, rawCookies, localStorageData, nil, cookieHeaderString); err != nil {
+		return err
+	}
+	log.Printf("[gfx_%s] ✅ DB + webhook updated for %s", tool.WebsiteID, tool.WebsiteID)
+	return nil
 }
 
 func airbrushSessionReady(rawCookies []CookieJSON, localStorageData map[string]interface{}) bool {

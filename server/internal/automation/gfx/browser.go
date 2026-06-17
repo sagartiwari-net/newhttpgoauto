@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -66,26 +65,14 @@ func (s *Session) Close() {
 	if s == nil {
 		return
 	}
-	if os.Getenv("GFX_KEEP_OPEN") == "1" {
-		browser := s.browser
-		s.browser = nil
-		log.Printf("[GFX] Keeping browser open 12s for inspection (account=%s) — task can finish now", s.slot.Account.WebsiteID)
-		go func() {
-			time.Sleep(12 * time.Second)
-			if browser != nil {
-				_ = browser.Close()
-			}
-		}()
-	} else {
-		log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
-		if s.browser != nil {
-			_ = s.browser.Close()
-		}
-		s.browser = nil
+	log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
+	if s.browser != nil {
+		_ = s.browser.Close()
 	}
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.browser = nil
 }
 
 func (s *Session) Browser() *rod.Browser { return s.browser }

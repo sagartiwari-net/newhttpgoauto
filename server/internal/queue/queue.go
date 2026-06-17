@@ -18,7 +18,7 @@ import (
 
 const (
 	TaskRunTimeout    = 70 * time.Second
-	GFXTaskRunTimeout = 180 * time.Second
+	GFXTaskRunTimeout = 90 * time.Second
 )
 
 // MaxTaskRunTimeout is used for stale-job cleanup.
