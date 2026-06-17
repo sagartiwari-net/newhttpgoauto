@@ -158,6 +158,7 @@ tr:hover td { background: #fafbfc; }
 }
 .badge-http { background: #ecfdf5; color: #059669; }
 .badge-chrome { background: #eef1ff; color: #4f6ef7; }
+.badge-portal { background: #f0fdf4; color: #15803d; }
 .badge-hybrid { background: #fff7ed; color: #ea580c; }
 .badge-cred { background: #fdf4ff; color: #a21caf; }
 .badge-success { background: var(--success-soft); color: var(--success); }

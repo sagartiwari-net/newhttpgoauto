@@ -31,38 +31,34 @@ var DefaultTasks = []TaskDef{
 	{UID: "seoshope_runSeoshopehome", Name: "SEOShope Portal Login", Group: "seoshope", AutomationType: "chrome_hybrid", IntervalMin: 60},
 }
 
-// EnsureTasks inserts missing tasks; existing rows are left unchanged.
+// EnsureTasks upserts built-in tasks (inserts new rows; updates name/type on existing).
 func EnsureTasks() {
 	all := append([]TaskDef{}, DefaultTasks...)
 	all = append(all, GFXTasks...)
 	log.Println("🌱 [DB] Syncing built-in tasks...")
-	var inserted int
+	var inserted, updated int
 	for _, t := range all {
-		var exists bool
-		if err := db.DB.QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM tasks WHERE task_uid=?)`, t.UID,
-		).Scan(&exists); err != nil {
-			log.Printf("⚠️ [DB] task check %s: %v", t.UID, err)
-			continue
-		}
-		if exists {
-			continue
-		}
-		_, err := db.DB.Exec(`
+		res, err := db.DB.Exec(`
 			INSERT INTO tasks (task_uid, task_name, website_group, automation_type, interval_minutes, is_enabled)
-			VALUES (?, ?, ?, ?, ?, 0)`,
+			VALUES (?, ?, ?, ?, ?, 0)
+			ON DUPLICATE KEY UPDATE
+				task_name = VALUES(task_name),
+				website_group = VALUES(website_group),
+				automation_type = VALUES(automation_type),
+				interval_minutes = VALUES(interval_minutes)`,
 			t.UID, t.Name, t.Group, t.AutomationType, t.IntervalMin,
 		)
 		if err != nil {
 			log.Printf("⚠️ [DB] seed %s: %v", t.UID, err)
 			continue
 		}
-		inserted++
-		log.Printf("🌱 [DB] Seeded task: %s", t.UID)
+		n, _ := res.RowsAffected()
+		if n == 1 {
+			inserted++
+			log.Printf("🌱 [DB] Seeded task: %s", t.UID)
+		} else if n == 2 {
+			updated++
+		}
 	}
-	if inserted == 0 {
-		log.Println("🌱 [DB] All built-in tasks already present")
-	} else {
-		log.Printf("🌱 [DB] Seeded %d new task(s)", inserted)
-	}
+	log.Printf("🌱 [DB] Sync done — %d new, %d updated", inserted, updated)
 }

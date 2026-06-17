@@ -80,6 +80,7 @@ func main() {
 			protected.GET("/auth/me", handlers.Me)
 			protected.GET("/stats", handlers.GetStats)
 			protected.GET("/tasks", handlers.ListTasks)
+			protected.POST("/tasks/sync-builtins", middleware.MasterOnly(), handlers.SyncBuiltinTasks)
 			protected.POST("/tasks/toggle", handlers.ToggleTask)
 			protected.POST("/tasks/interval", handlers.UpdateInterval)
 			protected.POST("/tasks/run-manual", handlers.RunTask)

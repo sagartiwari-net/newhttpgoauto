@@ -10,6 +10,7 @@ import (
 	"gohttpauto/internal/auth"
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
+	"gohttpauto/internal/dbseed"
 	"gohttpauto/internal/middleware"
 	"gohttpauto/internal/queue"
 
@@ -85,6 +86,12 @@ func ListTasks(c *gin.Context) {
 		list = []db.Task{}
 	}
 	c.JSON(http.StatusOK, list)
+}
+
+// SyncBuiltinTasks upserts code-defined tasks into MySQL (new automations appear in dashboard).
+func SyncBuiltinTasks(c *gin.Context) {
+	dbseed.EnsureTasks()
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "built-in tasks synced"})
 }
 
 type toggleReq struct {
