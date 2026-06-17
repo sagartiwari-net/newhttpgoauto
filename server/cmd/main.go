@@ -34,6 +34,7 @@ func main() {
 	defer db.Close()
 
 	handlers.EnsureMasterUser(cfg.MasterUsername, cfg.MasterPassword)
+	dbseed.EnsureSchema()
 	dbseed.EnsureTasks()
 	handlers.StartLogCleanupLoop()
 	if cfg.Role == "worker" {

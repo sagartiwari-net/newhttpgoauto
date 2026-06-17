@@ -11,6 +11,14 @@ git pull origin main
 echo "==> Building Go panel..."
 cd "$APP_DIR/server"
 go build -buildvcs=false -o gohttpauto ./cmd
+go build -buildvcs=false -o dbseed-sync ./cmd/dbseed
+
+echo "==> Syncing DB schema + built-in tasks..."
+set -a
+# shellcheck disable=SC1091
+source "$APP_DIR/server/.env"
+set +a
+"$APP_DIR/server/dbseed-sync"
 
 echo "==> Building dashboard..."
 cd "$APP_DIR/dashboard"

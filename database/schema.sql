@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── Automation tasks ────────────────────────────────────────────────────────
+--   chrome_portal    = GFX portal homepage capture (local file only)
 -- automation_type:
 --   http             = pure HTTP (no browser)
 --   chrome_extension = needs Chrome + extension
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `task_uid`          VARCHAR(100) NOT NULL PRIMARY KEY,
   `task_name`         VARCHAR(150) NOT NULL,
   `website_group`     VARCHAR(50)  NOT NULL,
-  `automation_type`   ENUM('http','chrome_extension','chrome_hybrid','cred_fetch') NOT NULL DEFAULT 'http',
+  `automation_type`   ENUM('http','chrome_extension','chrome_hybrid','cred_fetch','chrome_portal') NOT NULL DEFAULT 'http',
   `interval_minutes`  INT NOT NULL DEFAULT 60,
   `is_enabled`        TINYINT(1) NOT NULL DEFAULT 0,
   `last_run_at`       DATETIME DEFAULT NULL,
