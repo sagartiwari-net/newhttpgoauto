@@ -25,6 +25,7 @@ install_plist() {
 install_plist "$SCRIPT_DIR/com.gohttpauto.tunnel.plist" "com.gohttpauto.tunnel.plist"
 install_plist "$SCRIPT_DIR/com.gohttpauto.worker.plist" "com.gohttpauto.worker.plist"
 install_plist "$SCRIPT_DIR/com.gohttpauto.awake.plist" "com.gohttpauto.awake.plist"
+chmod +x "$SCRIPT_DIR/wait-mysql-and-run.sh"
 
 # Reload services
 launchctl bootout "gui/$(id -u)/com.gohttpauto.tunnel" 2>/dev/null || true

@@ -6,6 +6,7 @@
   <string>com.gohttpauto.worker</string>
   <key>ProgramArguments</key>
   <array>
+    <string>__APP_DIR__/deploy/macos/wait-mysql-and-run.sh</string>
     <string>__APP_DIR__/server/gohttpauto</string>
   </array>
   <key>WorkingDirectory</key>

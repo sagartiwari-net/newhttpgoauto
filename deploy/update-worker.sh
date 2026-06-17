@@ -18,7 +18,11 @@ MACOS="$APP_DIR/deploy/macos"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 mkdir -p "$PLIST_DIR" "$HOME/Library/Logs/gohttpauto" "$HOME/Desktop/screenshot/gfx"
 sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.worker.plist" > "$PLIST_DIR/com.gohttpauto.worker.plist"
+chmod +x "$MACOS/wait-mysql-and-run.sh"
+launchctl bootout "gui/$(id -u)/com.gohttpauto.tunnel" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || true
+sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.tunnel.plist" > "$PLIST_DIR/com.gohttpauto.tunnel.plist"
+launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.tunnel.plist"
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.worker.plist"
 
 echo "==> Restarting worker service..."

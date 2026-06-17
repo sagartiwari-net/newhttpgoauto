@@ -52,7 +52,7 @@ export default function Queue() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2>Job Queue</h2>
-          <p>Running and pending GFX tasks on the Mac worker. Other tasks run on the server. Stuck jobs auto-fail after 70 seconds.</p>
+          <p>Running and pending GFX tasks on the Mac worker. Other tasks run on the server. Stuck jobs auto-fail after 90 seconds.</p>
         </div>
         <button className="btn btn-sm" onClick={load} disabled={loading}>
           <RefreshCw size={14} /> Refresh
@@ -69,8 +69,8 @@ export default function Queue() {
           }}
         >
           <div className="card-body" style={{ color: '#c0392b' }}>
-            <strong>Worker Mac offline</strong> — jobs stay pending until the worker is running
-            and can reach MySQL.
+            <strong>Worker Mac offline</strong> — jobs stay pending until the worker process is running
+            and can reach MySQL via the SSH tunnel (Mac Wi‑Fi alone is not enough).
             {worker.last_seen ? (
               <div style={{ fontSize: 12, marginTop: 6 }}>
                 Last seen: {fmtTime(worker.last_seen)} ({worker.worker_id})

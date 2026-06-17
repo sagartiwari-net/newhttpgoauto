@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -10,6 +11,23 @@ import (
 )
 
 var DB *sql.DB
+
+// PingContext checks whether the pool can reach MySQL.
+func PingContext(ctx context.Context) error {
+	if DB == nil {
+		return fmt.Errorf("db not initialized")
+	}
+	return DB.PingContext(ctx)
+}
+
+// Reconnect closes the pool and opens a new one (e.g. after SSH tunnel drop).
+func Reconnect(host, port, user, pass, name string) error {
+	if DB != nil {
+		_ = DB.Close()
+		DB = nil
+	}
+	return Init(host, port, user, pass, name)
+}
 
 func Init(host, port, user, pass, name string) error {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&charset=utf8mb4",

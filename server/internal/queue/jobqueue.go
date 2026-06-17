@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -17,7 +18,7 @@ const (
 	queueMaintainEvery   = 15 * time.Second
 	queuePollInterval    = 50 * time.Millisecond
 	workerHeartbeatKey   = "worker:heartbeat"
-	workerAliveWindow    = 90 * time.Second
+	workerAliveWindow    = 3 * time.Minute
 	workerHeartbeatEvery = 5 * time.Second
 )
 
@@ -128,6 +129,10 @@ func GetWorkerStatus() WorkerStatus {
 }
 
 func touchWorkerHeartbeat() {
+	if err := ensureDBConnection(); err != nil {
+		log.Printf("⚠️ [WORKER] heartbeat skipped — MySQL unreachable: %v", err)
+		return
+	}
 	wid := workerID()
 	_, err := db.DB.Exec(`
 		INSERT INTO system_locks (lock_key, lock_state, locked_by, locked_at, expires_at)
@@ -137,6 +142,25 @@ func touchWorkerHeartbeat() {
 	if err != nil {
 		log.Printf("⚠️ [WORKER] heartbeat update failed: %v", err)
 	}
+}
+
+func ensureDBConnection() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err == nil {
+		return nil
+	}
+	if config.Global == nil {
+		return fmt.Errorf("mysql ping failed")
+	}
+	log.Printf("⚠️ [WORKER] MySQL ping failed — reconnecting to %s:%s", config.Global.DBHost, config.Global.DBPort)
+	return db.Reconnect(
+		config.Global.DBHost,
+		config.Global.DBPort,
+		config.Global.DBUser,
+		config.Global.DBPass,
+		config.Global.DBName,
+	)
 }
 
 // CancelJob removes a pending job from the queue (kill).
@@ -252,8 +276,7 @@ func startWorkerHeartbeat() {
 }
 
 func pollOnce() {
-	if err := pingDB(); err != nil {
-		log.Printf("⚠️ [WORKER] DB ping failed: %v", err)
+	if err := ensureDBConnection(); err != nil {
 		return
 	}
 
@@ -307,12 +330,7 @@ func pollOnce() {
 }
 
 func pingDB() error {
-	if db.DB == nil {
-		return errors.New("db not initialized")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return db.DB.PingContext(ctx)
+	return ensureDBConnection()
 }
 
 func runClaimedJob(id int, taskUID, triggeredBy, accountID string) {
