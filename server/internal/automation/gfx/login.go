@@ -52,13 +52,6 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		return nil, ctx.Err()
 	}
 
-	if session.portalMode {
-		if u := safeURL(); strings.Contains(u, "signin") {
-			_, _ = page.Eval(`() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }`)
-			log.Printf("[gfx_%s] Cleared stale portal storage before login", slot.Account.WebsiteID)
-		}
-	}
-
 	for i := 0; i < 20; i++ {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()

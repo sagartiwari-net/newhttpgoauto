@@ -16,6 +16,8 @@ import (
 
 const maxErrorScreenshots = 5
 
+var lastSavedPath string
+
 var safeName = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
 // Root returns the Desktop screenshot folder on Mac worker (override with GOAUTO_SCREENSHOT_PATH).
@@ -58,6 +60,20 @@ func Dir(tool string, group ...string) string {
 
 // SaveError captures the page on failure; keeps latest N per folder.
 func SaveError(page *rod.Page, logTag, tool, group, step string) {
+	savePage(page, logTag, tool, group, step, maxErrorScreenshots)
+}
+
+// SaveCapture saves a screenshot whenever session/cookies are saved (success path).
+func SaveCapture(page *rod.Page, logTag, tool, group, step string) {
+	savePage(page, logTag, tool, group, "capture_"+step, maxCaptureScreenshots)
+}
+
+const maxCaptureScreenshots = 10
+
+// LastSavedPath returns the path from the most recent SaveError/SaveCapture call.
+func LastSavedPath() string { return lastSavedPath }
+
+func savePage(page *rod.Page, logTag, tool, group, step string, keep int) {
 	if page == nil {
 		return
 	}
@@ -80,8 +96,9 @@ func SaveError(page *rod.Page, logTag, tool, group, step string) {
 		log.Printf("[%s] Screenshot write error: %v", logTag, err)
 		return
 	}
-	prune(dir)
-	log.Printf("[%s] Error screenshot → %s", logTag, path)
+	lastSavedPath = path
+	prune(dir, keep)
+	log.Printf("[%s] Screenshot → %s", logTag, path)
 }
 
 func sanitize(s, fallback string) string {
@@ -97,7 +114,7 @@ type shotFile struct {
 	modTime time.Time
 }
 
-func prune(dir string) {
+func prune(dir string, keep int) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -113,11 +130,11 @@ func prune(dir string) {
 		}
 		files = append(files, shotFile{path: filepath.Join(dir, e.Name()), modTime: info.ModTime()})
 	}
-	if len(files) <= maxErrorScreenshots {
+	if len(files) <= keep {
 		return
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].modTime.Before(files[j].modTime) })
-	for i := 0; i < len(files)-maxErrorScreenshots; i++ {
+	for i := 0; i < len(files)-keep; i++ {
 		_ = os.Remove(files[i].path)
 	}
 }

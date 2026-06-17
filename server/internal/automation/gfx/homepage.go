@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 	accountID := session.Slot().Account.WebsiteID
 	log.Printf("[gfx_portal] Capturing GFX homepage session (account=%s, profile=%s)", accountID, session.Slot().ProfileDir)
 
-	page, err := ensureGFXLogin(ctx, session, gfxPortalHomeURL)
+	page, loginBody, err := ensurePortalLogin(ctx, session, gfxPortalHomeURL)
 	if err != nil {
 		return err
 	}
@@ -39,23 +38,29 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 		return err
 	}
 
-	log.Printf("[gfx_portal] Settling 6s then polling localStorage...")
-	time.Sleep(6 * time.Second)
+	log.Printf("[gfx_portal] Settling 8s then polling localStorage...")
+	time.Sleep(8 * time.Second)
 
-	localStorageData := waitForPortalLocalStorage(ctx, page, 12*time.Second)
+	localStorageData := waitForPortalLocalStorage(ctx, page, 15*time.Second)
 	if len(localStorageData) == 0 {
 		saveErrorScreenshot(page, accountID, "portal_empty")
 		return fmt.Errorf("no localStorage captured from GFX homepage")
 	}
-	if !portalLocalStorageReady(localStorageData) {
+
+	mergeLoginTokensIntoStorage(localStorageData, loginBody)
+
+	if !portalLocalStorageReady(localStorageData) || !portalPageLooksLoggedIn(page) {
 		keys := storageKeyNames(localStorageData)
 		saveErrorScreenshot(page, accountID, "portal_not_ready")
-		return fmt.Errorf("portal localStorage session not ready (keys=%v)", keys)
+		saveCaptureScreenshot(page, accountID, "portal_not_ready_debug")
+		return fmt.Errorf("portal session not ready (keys=%v, loggedIn=%v)", keys, portalPageLooksLoggedIn(page))
 	}
 
 	referer := gfxPortalHomeURL
+	pageURL := ""
 	if info, err := page.Info(); err == nil && info.URL != "" && !strings.Contains(info.URL, "signin") {
 		referer = info.URL
+		pageURL = info.URL
 	}
 
 	payload := map[string]interface{}{
@@ -76,9 +81,44 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 		return fmt.Errorf("write portal cookie file: %w", err)
 	}
 
-	log.Printf("[gfx_portal] ✅ Saved homepage localStorage session to %s (%d keys, fp=%s)",
-		outPath, len(localStorageData), localStorageData["device_fingerprint"])
+	shotPath := saveCaptureScreenshot(page, accountID, "portal_home_saved")
+	log.Printf("[gfx_portal] ✅ Saved homepage localStorage to %s (%d keys, url=%s, screenshot=%s)",
+		outPath, len(localStorageData), pageURL, shotPath)
 	return nil
+}
+
+func mergeLoginTokensIntoStorage(data map[string]interface{}, loginBody string) {
+	loginBody = strings.TrimSpace(loginBody)
+	if loginBody == "" {
+		return
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(loginBody), &parsed); err != nil {
+		return
+	}
+	if at := tokenFromLoginJSON(parsed, "accessToken"); at != "" {
+		data["accessToken"] = at
+	}
+	if rt := tokenFromLoginJSON(parsed, "refreshToken"); rt != "" {
+		data["refreshToken"] = rt
+	}
+	if user, ok := parsed["user"]; ok {
+		if b, err := json.Marshal(user); err == nil {
+			data["user"] = string(b)
+		}
+	}
+}
+
+func tokenFromLoginJSON(parsed map[string]interface{}, key string) string {
+	if v, ok := parsed[key].(string); ok && len(v) > 10 {
+		return v
+	}
+	if data, ok := parsed["data"].(map[string]interface{}); ok {
+		if v, ok := data[key].(string); ok && len(v) > 10 {
+			return v
+		}
+	}
+	return ""
 }
 
 func waitForPortalDashboard(ctx context.Context, page *rod.Page) error {
@@ -86,16 +126,7 @@ func waitForPortalDashboard(ctx context.Context, page *rod.Page) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		res, err := page.Eval(`() => {
-			const url = location.href || '';
-			if (url.includes('signin')) return false;
-			if (document.querySelector('a[href*="/tools/"]')) return true;
-			if (document.querySelector('[data-tool-cookie]')) return true;
-			if (document.querySelector('[data-tool-id]')) return true;
-			const text = (document.body && document.body.innerText) ? document.body.innerText : '';
-			return text.length > 400;
-		}`)
-		if err == nil && res.Value.Bool() {
+		if portalPageLooksLoggedIn(page) {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -135,59 +166,7 @@ func portalLocalStorageReady(data map[string]interface{}) bool {
 	if strings.TrimSpace(fp) == "" {
 		return false
 	}
-
-	hasAuthKey := false
-	for k := range data {
-		kl := strings.ToLower(k)
-		if strings.Contains(kl, "auth") || strings.Contains(kl, "token") || strings.Contains(kl, "firebase") {
-			hasAuthKey = true
-			break
-		}
-	}
-
-	posthogReady := false
-	for k, v := range data {
-		if !strings.Contains(k, "posthog") {
-			continue
-		}
-		s, ok := v.(string)
-		if !ok {
-			continue
-		}
-		if strings.Contains(s, "$sess_rec_flush_size") || strings.Contains(s, `"$user_state":"identified"`) {
-			posthogReady = true
-			break
-		}
-	}
-
-	guestFresh := guestIDIsFresh(data["popup_guest_id"])
-	if hasAuthKey {
-		return true
-	}
-	if posthogReady && guestFresh {
-		return true
-	}
-	if guestFresh && len(data) >= 7 {
-		return true
-	}
-	return false
-}
-
-func guestIDIsFresh(v interface{}) bool {
-	guest, ok := v.(string)
-	if !ok || !strings.HasPrefix(guest, "guest_") {
-		return false
-	}
-	parts := strings.Split(guest, "_")
-	if len(parts) < 2 {
-		return false
-	}
-	ts, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil || ts <= 0 {
-		return false
-	}
-	age := time.Now().UnixMilli() - ts
-	return age >= 0 && age <= 3*60*1000
+	return localStorageHasAuthSession(data)
 }
 
 func storageKeyNames(data map[string]interface{}) []string {

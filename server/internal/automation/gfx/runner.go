@@ -20,7 +20,7 @@ func Run(taskUID string) (status, msg string) {
 
 	timeout := taskTimeout
 	if tool.Kind == KindPortalHome {
-		timeout = 95 * time.Second
+		timeout = 110 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
