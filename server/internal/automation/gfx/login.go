@@ -10,27 +10,16 @@ import (
 	"github.com/go-rod/rod"
 )
 
-const gfxSigninURL = "https://app.gfxtoolz.ai/signin"
+const (
+	gfxSigninURL    = "https://app.gfxtoolz.ai/signin"
+	gfxPortalURL    = "https://app.gfxtoolz.ai/"
+	reactSettleWait = 2 * time.Second
+)
 
-func gfxSessionActive(page *rod.Page) bool {
+func gfxLoginFormVisible(page *rod.Page) bool {
 	res, err := page.Eval(`() => {
-		const body = (document.body && document.body.innerText) ? document.body.innerText : '';
-		const url = location.href || '';
-		if (url.includes('signin')) return false;
-		if (body.includes('SIGN-IN REQUIRED') || body.includes('Sign in to launch')) return false;
-		if (body.includes('Sign in to GFXToolz') && document.querySelector('input[type="password"]')) return false;
-		const labels = Array.from(document.querySelectorAll('button,a')).map(el => (el.textContent||'').trim());
-		if (labels.includes('Login') && labels.includes('Sign up') && !document.querySelector('[data-tool-cookie="true"]')) return false;
-		if (url.includes('/tools/')) {
-			if (document.querySelector('[data-tool-cookie="true"]')) return true;
-			const t = (s) => (s||'').replace(/\s+/g,' ').trim().toLowerCase();
-			return [...document.querySelectorAll('button,a,[role="button"]')].some(el => {
-				const txt = t(el.textContent);
-				return txt.includes('access now') || txt.includes('get access') || txt.includes('launch') || txt.includes('open tool') || txt === 'access';
-			});
-		}
-		if (document.querySelector('[data-tool-cookie="true"]')) return true;
-		return !labels.includes('Login') || !labels.includes('Sign up');
+		return !!document.querySelector('input[type="email"]') &&
+			!!document.querySelector('input[type="password"]');
 	}`)
 	return err == nil && res.Value.Bool()
 }
@@ -38,30 +27,71 @@ func gfxSessionActive(page *rod.Page) bool {
 func gfxGuestState(page *rod.Page) bool {
 	res, err := page.Eval(`() => {
 		const body = (document.body && document.body.innerText) ? document.body.innerText : '';
-		const url = location.href || '';
-		if (url.includes('signin')) return true;
 		if (body.includes('SIGN-IN REQUIRED') || body.includes('Sign in to launch')) return true;
 		if (body.includes('Sign in to GFXToolz') && document.querySelector('input[type="password"]')) return true;
 		const labels = Array.from(document.querySelectorAll('button,a')).map(el => (el.textContent||'').trim());
-		if (labels.includes('Login') && labels.includes('Sign up') && !document.querySelector('button[data-tool-cookie="true"]')) return true;
+		if (labels.includes('Login') && labels.includes('Sign up')) return true;
 		return false;
 	}`)
 	return err == nil && res.Value.Bool()
 }
 
-// ensureGFXLogin opens the tool page, logs in if needed, leaves page ready for access button.
-// The bool return is true when credentials were used (fresh login) vs an existing cookie session.
-func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*rod.Page, bool, error) {
+func gfxLoggedInPortal(page *rod.Page) bool {
+	res, err := page.Eval(`() => {
+		const url = location.href || '';
+		if (url.includes('signin')) return false;
+		const body = (document.body && document.body.innerText) ? document.body.innerText : '';
+		if (body.includes('SIGN-IN REQUIRED') || body.includes('Sign in to launch')) return false;
+		if (body.includes('Sign in to GFXToolz') && document.querySelector('input[type="password"]')) return false;
+		if (body.includes('Welcome back') || body.includes('What would you like to do today')) return true;
+		const labels = Array.from(document.querySelectorAll('button,a')).map(el => (el.textContent||'').trim());
+		if (labels.includes('Login') && labels.includes('Sign up')) return false;
+		if (document.querySelector('[data-tool-cookie="true"]')) return true;
+		return false;
+	}`)
+	return err == nil && res.Value.Bool()
+}
+
+func gfxClickLoginEntry(page *rod.Page) bool {
+	res, err := page.Eval(`() => {
+		const pick = [...document.querySelectorAll('button,a,[role="button"]')].find(el => {
+			const t = (el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+			return t === 'login' || t === 'sign in' || t.startsWith('sign in');
+		});
+		if (pick) { pick.click(); return true; }
+		return false;
+	}`)
+	return err == nil && res.Value.Bool()
+}
+
+func waitReactSettle(ctx context.Context) error {
+	deadline := time.Now().Add(reactSettleWait)
+	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return nil
+}
+
+func solveCloudflareIfNeeded(page *rod.Page, accountID string, titleFn func() string) {
+	title := titleFn()
+	if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
+		log.Printf("[gfx_%s] Cloudflare challenge — solving...", accountID)
+		solveCloudflare(page)
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// ensureGFXLogin always opens /signin first, logs in if needed, returns freshLogin when credentials were used.
+// Tool page navigation happens after optional Chrome relaunch in runner.go.
+func ensureGFXLogin(ctx context.Context, session *Session, _ string) (*rod.Page, bool, error) {
 	page := session.newPage()
 	slot := session.Slot()
 	username := slot.Account.Username
 	password := slot.Account.Password
 	accountID := slot.Account.WebsiteID
-	freshLogin := false
-
-	if startURL == "" {
-		startURL = gfxSigninURL
-	}
 
 	safeURL := func() string {
 		if ctx.Err() != nil {
@@ -84,78 +114,62 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		return info.Title
 	}
 
-	log.Printf("[gfx_%s] Opening GFX portal: %s", accountID, startURL)
-	if err := page.Timeout(45 * time.Second).Navigate(startURL); err != nil {
-		log.Printf("[gfx_%s] Navigation warning: %v", accountID, err)
+	log.Printf("[gfx_%s] Step 1: opening sign-in page %s", accountID, gfxSigninURL)
+	if err := page.Timeout(45 * time.Second).Navigate(gfxSigninURL); err != nil {
+		log.Printf("[gfx_%s] Sign-in navigation warning: %v", accountID, err)
 	}
 	if ctx.Err() != nil {
 		return nil, false, ctx.Err()
 	}
 
-	// Wait for React — do NOT trust URL-only "already logged in" on empty/loading page.
-	for i := 0; i < 30; i++ {
+	log.Printf("[gfx_%s] Waiting %s for React to settle...", accountID, reactSettleWait)
+	if err := waitReactSettle(ctx); err != nil {
+		return nil, false, err
+	}
+	solveCloudflareIfNeeded(page, accountID, safeTitle)
+
+	if gfxLoggedInPortal(page) {
+		log.Printf("[gfx_%s] Cookie session — already logged in at %s", accountID, safeURL())
+		return page, false, nil
+	}
+
+	// Still on signin or dashboard with login prompt — wait for form or login button.
+	for i := 0; i < 15; i++ {
 		if ctx.Err() != nil {
 			return nil, false, ctx.Err()
 		}
-		if gfxSessionActive(page) {
-			log.Printf("[gfx_%s] Session active (%s)", accountID, safeURL())
+		if gfxLoggedInPortal(page) {
+			log.Printf("[gfx_%s] Logged in (redirect) at %s", accountID, safeURL())
 			return page, false, nil
 		}
-		title := safeTitle()
-		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
-			solveCloudflare(page)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		if gfxGuestState(page) {
+		if gfxLoginFormVisible(page) {
 			break
 		}
-		hasEmail, _, _ := page.Has("input[type='email']")
-		if hasEmail {
-			break
+		if gfxClickLoginEntry(page) {
+			log.Printf("[gfx_%s] Clicked Login entry — waiting for form...", accountID)
+			time.Sleep(reactSettleWait)
+			if gfxLoginFormVisible(page) {
+				break
+			}
 		}
-		time.Sleep(250 * time.Millisecond)
+		solveCloudflareIfNeeded(page, accountID, safeTitle)
+		time.Sleep(400 * time.Millisecond)
 	}
 
-	if gfxSessionActive(page) {
+	if gfxLoggedInPortal(page) {
 		return page, false, nil
 	}
 
-	if !strings.Contains(safeURL(), "signin") {
-		log.Printf("[gfx_%s] Not logged in — opening sign-in page", accountID)
-		_ = page.Timeout(30 * time.Second).Navigate(gfxSigninURL)
+	if !gfxLoginFormVisible(page) {
+		shot := saveErrorScreenshot(page, accountID, "login_form_missing")
+		msg := fmt.Sprintf("login form not found on sign-in page for %s (url: %s)", accountID, safeURL())
+		if shot != "" {
+			msg += " | screenshot: " + shot
+		}
+		return nil, false, fmt.Errorf("%s", msg)
 	}
 
-	for i := 0; i < 40; i++ {
-		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
-		}
-		if gfxSessionActive(page) {
-			break
-		}
-		hasEmail, _, _ := page.Has("input[type='email']")
-		if hasEmail {
-			break
-		}
-		title := safeTitle()
-		if strings.Contains(title, "Just a moment") || strings.Contains(title, "Checking your browser") {
-			solveCloudflare(page)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	if gfxSessionActive(page) {
-		log.Printf("[gfx_%s] Logged in after redirect", accountID)
-		if startURL != gfxSigninURL && startURL != "" {
-			_ = page.Timeout(30 * time.Second).Navigate(startURL)
-			waitSessionOnToolPage(ctx, page, accountID)
-		}
-		return page, false, nil
-	}
-
-	log.Printf("[gfx_%s] Logging in with credentials...", accountID)
+	log.Printf("[gfx_%s] Step 2: filling credentials...", accountID)
 	stopWatch, loginAPI := watchGFXLoginAPI(page)
 	defer stopWatch()
 
@@ -174,12 +188,7 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		return nil, false, fmt.Errorf("failed to fill credentials: %w", err)
 	}
 	if filled != nil && !filled.Value.Bool() {
-		shot := saveErrorScreenshot(page, accountID, "login_form_missing")
-		msg := fmt.Sprintf("login form not found for %s", accountID)
-		if shot != "" {
-			msg += " | screenshot: " + shot
-		}
-		return nil, false, fmt.Errorf("%s", msg)
+		return nil, false, fmt.Errorf("failed to fill credentials for %s", accountID)
 	}
 
 	_, _ = page.Eval(`() => {
@@ -191,18 +200,21 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 
 	loggedIn := false
 	showDeviceLimit := false
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 50; i++ {
 		if ctx.Err() != nil {
 			return nil, false, ctx.Err()
 		}
-		urlNow := safeURL()
-		if urlNow != "" && !strings.Contains(urlNow, "signin") {
+		if gfxLoggedInPortal(page) {
 			loggedIn = true
 			break
 		}
-		if gfxSessionActive(page) {
-			loggedIn = true
-			break
+		urlNow := safeURL()
+		if urlNow != "" && !strings.Contains(urlNow, "signin") && strings.Contains(urlNow, "gfxtoolz.ai") {
+			time.Sleep(reactSettleWait)
+			if gfxLoggedInPortal(page) {
+				loggedIn = true
+				break
+			}
 		}
 		status, body, seen := loginAPI.snapshot()
 		if seen && status >= 200 && status < 300 && loginBodyHasToken(body) {
@@ -226,8 +238,8 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 			if (btn) { btn.click(); return true; }
 			return false;
 		}`)
-		for k := 0; k < 20; k++ {
-			if gfxSessionActive(page) {
+		for k := 0; k < 25; k++ {
+			if gfxLoggedInPortal(page) {
 				loggedIn = true
 				break
 			}
@@ -245,25 +257,53 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 		return nil, false, fmt.Errorf("%s", errMsg)
 	}
 
-	freshLogin = true
-	log.Printf("[gfx_%s] Credential login successful → %s (Chrome relaunch next)", accountID, safeURL())
-	return page, freshLogin, nil
+	log.Printf("[gfx_%s] Step 3: credential login OK → %s (Chrome relaunch next)", accountID, safeURL())
+	return page, true, nil
 }
 
-func waitSessionOnToolPage(ctx context.Context, page *rod.Page, accountID string) error {
+func prepareToolPage(ctx context.Context, page *rod.Page, toolURL, accountID string) error {
+	log.Printf("[gfx_%s] Navigating to tool page: %s", accountID, toolURL)
+	if err := page.Timeout(45 * time.Second).Navigate(toolURL); err != nil {
+		log.Printf("[gfx_%s] Tool navigation warning: %v", accountID, err)
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	time.Sleep(reactSettleWait)
+
+	if !waitExtensionInject(page, 24) {
+		log.Printf("[gfx_%s] Extension not on tool page — reloading", accountID)
+		_ = page.Timeout(30 * time.Second).Reload()
+		time.Sleep(reactSettleWait)
+		if !waitExtensionInject(page, 16) {
+			return fmt.Errorf("GFX extension not active on tool page for %s", accountID)
+		}
+	}
+
+	dismissNonAuthDialogs(page)
+	scrollPageForButtons(page)
+
 	for i := 0; i < 40; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if gfxAccessButtonReady(page) || gfxSessionActive(page) {
+		if gfxAccessButtonReady(page) {
+			log.Printf("[gfx_%s] Access button ready on tool page", accountID)
 			return nil
 		}
-		if i == 5 {
+		if i == 6 || i == 18 {
 			scrollPageForButtons(page)
 		}
-		time.Sleep(300 * time.Millisecond)
+		if i == 12 {
+			_ = page.Timeout(30 * time.Second).Reload()
+			time.Sleep(reactSettleWait)
+			waitExtensionInject(page, 12)
+			dismissNonAuthDialogs(page)
+			scrollPageForButtons(page)
+		}
+		time.Sleep(400 * time.Millisecond)
 	}
-	return fmt.Errorf("tool page loaded but access button not ready for %s (login may have failed)", accountID)
+	return fmt.Errorf("access button not ready on tool page for %s", accountID)
 }
 
 func loginBodyHasToken(body string) bool {

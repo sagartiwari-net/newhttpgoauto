@@ -2,6 +2,7 @@ package gfx
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -57,7 +58,23 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	sessCtx, cancel := context.WithCancel(ctx)
 	browser := rod.New().ControlURL(u).MustConnect().Context(sessCtx)
 	logGFXNetworkFilterOnce()
+	if err := requireExtensionLoaded(browser, extPath, slot.Account.WebsiteID); err != nil {
+		cancel()
+		_ = browser.Close()
+		return nil, err
+	}
 	return &Session{slot: slot, browser: browser, cancel: cancel}, nil
+}
+
+func requireExtensionLoaded(browser *rod.Browser, extPath, accountID string) error {
+	page := stealth.MustPage(browser)
+	defer func() { _ = page.Close() }()
+	_ = page.Navigate("about:blank")
+	if waitExtensionInject(page, 16) {
+		log.Printf("[GFX] Extension loaded OK (account=%s)", accountID)
+		return nil
+	}
+	return fmt.Errorf("GFX extension failed to load from %s", extPath)
 }
 
 func (s *Session) Close() {
@@ -88,6 +105,7 @@ func (s *Session) Relaunch(ctx context.Context) error {
 	accountID := s.slot.Account.WebsiteID
 	log.Printf("[GFX] Relaunching Chrome after login (account=%s)", accountID)
 	s.closeBrowser()
+	time.Sleep(1500 * time.Millisecond)
 
 	for _, lf := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
 		_ = os.Remove(filepath.Join(s.slot.ProfileDir, lf))
@@ -116,6 +134,11 @@ func (s *Session) Relaunch(ctx context.Context) error {
 	sessCtx, cancel := context.WithCancel(ctx)
 	s.browser = rod.New().ControlURL(u).MustConnect().Context(sessCtx)
 	s.cancel = cancel
+	if err := requireExtensionLoaded(s.browser, extPath, accountID); err != nil {
+		cancel()
+		s.closeBrowser()
+		return err
+	}
 	log.Printf("[GFX] Chrome relaunched (account=%s)", accountID)
 	return nil
 }
