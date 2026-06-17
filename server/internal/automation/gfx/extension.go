@@ -83,7 +83,16 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		time.Sleep(1 * time.Second)
 	}
 
-	// Dismiss dialogs/modals
+	if gfxGuestVisible(page) || !gfxLoggedIn(page) {
+		shot := saveErrorScreenshot(page, tool.WebsiteID, "not_logged_in")
+		msg := fmt.Sprintf("not logged in on tool page — session expired? (account %s)", session.Slot().Account.WebsiteID)
+		if shot != "" {
+			msg += " | screenshot: " + shot
+		}
+		return fmt.Errorf("%s", msg)
+	}
+
+	// Dismiss non-auth dialogs only.
 	_, _ = page.Eval(`() => {
 		const ev = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true });
 		document.dispatchEvent(ev);
