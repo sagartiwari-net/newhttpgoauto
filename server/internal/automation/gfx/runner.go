@@ -18,7 +18,11 @@ func Run(taskUID string) (status, msg string) {
 	AcquireParallel()
 	defer ReleaseParallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+	timeout := taskTimeout
+	if tool.Kind == KindPortalHome {
+		timeout = 95 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	var slot Slot

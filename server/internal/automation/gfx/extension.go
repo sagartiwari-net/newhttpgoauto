@@ -556,6 +556,84 @@ func readLocalStorage(page *rod.Page) map[string]interface{} {
 	return data
 }
 
+func readSessionStorage(page *rod.Page) map[string]interface{} {
+	data := make(map[string]interface{})
+	res, err := page.Eval(`() => {
+		const data = {};
+		try {
+			for (let i = 0; i < sessionStorage.length; i++) {
+				const key = sessionStorage.key(i);
+				data[key] = sessionStorage.getItem(key);
+			}
+		} catch(e) {}
+		return data;
+	}`)
+	if err == nil {
+		_ = res.Value.Unmarshal(&data)
+	}
+	return data
+}
+
+func mergeStorageMaps(parts ...map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for _, part := range parts {
+		for k, v := range part {
+			if _, exists := out[k]; !exists {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
+
+// readFirebaseLocalStorage merges firebase auth rows from IndexedDB into a localStorage-shaped map.
+func readFirebaseLocalStorage(page *rod.Page) map[string]interface{} {
+	data := make(map[string]interface{})
+	res, err := page.Timeout(8 * time.Second).Eval(`async () => {
+		const out = {};
+		try {
+			await new Promise((resolve) => {
+				const req = indexedDB.open('firebaseLocalStorageDb');
+				req.onerror = () => resolve();
+				req.onsuccess = (e) => {
+					const db = e.target.result;
+					if (!db.objectStoreNames.contains('firebaseLocalStorage')) {
+						db.close();
+						resolve();
+						return;
+					}
+					const tx = db.transaction('firebaseLocalStorage', 'readonly');
+					const store = tx.objectStore('firebaseLocalStorage');
+					const all = store.getAll();
+					all.onsuccess = () => {
+						for (const row of (all.result || [])) {
+							if (row && row.fbase_key) {
+								out[row.fbase_key] = JSON.stringify(row.value ?? row);
+							}
+						}
+						db.close();
+						resolve();
+					};
+					all.onerror = () => { db.close(); resolve(); };
+				};
+			});
+		} catch(e) {}
+		return out;
+	}`)
+	if err == nil {
+		_ = res.Value.Unmarshal(&data)
+	}
+	return data
+}
+
+func readPortalStorage(page *rod.Page) map[string]interface{} {
+	return mergeStorageMaps(
+		readLocalStorage(page),
+		readSessionStorage(page),
+		readFirebaseLocalStorage(page),
+	)
+}
+
 func saveCapturedSession(
 	ctx context.Context,
 	tool ToolDef,
