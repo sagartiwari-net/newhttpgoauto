@@ -69,7 +69,8 @@ func Run(taskUID string) (status, msg string) {
 		if err := runPortalHomepage(ctx, session, tool); err != nil {
 			return "failed", err.Error()
 		}
-		return "success", "GFX homepage cookies saved locally (" + slot.Account.WebsiteID + ")"
+		out := portalHomepageCookieFile()
+		return "success", "GFX homepage cookies saved locally → " + out
 	case KindCredFetch:
 		if _, err := ensureGFXLogin(ctx, session, ""); err != nil {
 			return "failed", "gfx login failed: " + err.Error()
