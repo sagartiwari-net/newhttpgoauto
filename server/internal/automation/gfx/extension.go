@@ -132,7 +132,7 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 	}
 
 	if !btnFound {
-		saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
+		shot := saveErrorScreenshot(page, tool.WebsiteID, "no_access_btn")
 		// Dump buttons info to debug
 		resDebug, errDebug := page.Eval(`() => {
 			const btns = Array.from(document.querySelectorAll('button'));
@@ -148,7 +148,11 @@ func runExtension(ctx context.Context, session *Session, tool ToolDef, gfxPage *
 		} else {
 			log.Printf("[gfx_%s] Failed to dump debug buttons: %v", tool.WebsiteID, errDebug)
 		}
-		return fmt.Errorf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
+		msg := fmt.Sprintf("access button not found on page (selector: %s, fallbackIndex: %d)", tool.Selector, tool.FallbackIndex)
+		if shot != "" {
+			msg += " | screenshot: " + shot
+		}
+		return fmt.Errorf("%s", msg)
 	}
 
 	// Setup event listener to capture the new tab ID

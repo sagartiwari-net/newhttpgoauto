@@ -142,16 +142,24 @@ func ensureGFXLogin(ctx context.Context, session *Session, startURL string) (*ro
 			time.Sleep(300 * time.Millisecond)
 		}
 		if !isRedirected {
-			saveErrorScreenshot(page, accountID, "device_limit")
-			return nil, fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, "device limit — Sign In Again did not work"))
+			shot := saveErrorScreenshot(page, accountID, "device_limit")
+			errMsg := formatGFXLoginFailure(accountID, loginAPI, "device limit — Sign In Again did not work")
+			if shot != "" {
+				errMsg += " | screenshot: " + shot
+			}
+			return nil, fmt.Errorf("%s", errMsg)
 		}
 	}
 
 	if !isRedirected {
 		time.Sleep(1 * time.Second)
 		pageErr := readPageLoginError(page)
-		saveErrorScreenshot(page, accountID, "signin_failed")
-		return nil, fmt.Errorf("%s", formatGFXLoginFailure(accountID, loginAPI, pageErr))
+		shot := saveErrorScreenshot(page, accountID, "signin_failed")
+		errMsg := formatGFXLoginFailure(accountID, loginAPI, pageErr)
+		if shot != "" {
+			errMsg += " | screenshot: " + shot
+		}
+		return nil, fmt.Errorf("%s", errMsg)
 	}
 
 	if startURL != "" && !strings.Contains(safeURL(), "/tools/") {

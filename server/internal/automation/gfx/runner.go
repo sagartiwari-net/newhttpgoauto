@@ -3,6 +3,7 @@ package gfx
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 )
 
@@ -31,6 +32,10 @@ func Run(taskUID string) (status, msg string) {
 	defer mu.Unlock()
 
 	log.Printf("[GFX] Task %s → account %s profile %s", taskUID, slot.Account.WebsiteID, slot.ProfileDir)
+	log.Printf("[GFX] Error screenshots → %s", screenshotRoot()+"/gfx/")
+	if os.Getenv("GFX_VISIBLE") == "1" {
+		log.Printf("[GFX] Chrome visible (GFX_VISIBLE=1) — watch Mac screen during task")
+	}
 
 	session, err := newSession(ctx, slot)
 	if err != nil {

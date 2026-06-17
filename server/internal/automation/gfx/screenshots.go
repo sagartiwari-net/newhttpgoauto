@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -13,33 +14,46 @@ import (
 	"github.com/go-rod/rod"
 )
 
-const maxErrorScreenshots = 3
+const maxErrorScreenshots = 5
 
 var safeStepName = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
+
+// screenshotRoot is where failure screenshots are saved (Desktop on Mac worker).
+func screenshotRoot() string {
+	if p := os.Getenv("GOAUTO_SCREENSHOT_PATH"); p != "" {
+		return p
+	}
+	if runtime.GOOS == "darwin" {
+		if home := os.Getenv("HOME"); home != "" {
+			return filepath.Join(home, "Desktop", "screenshot")
+		}
+	}
+	return filepath.Join(dataRoot(), "screenshots")
+}
 
 func errorScreenshotDir(group string) string {
 	group = strings.Trim(safeStepName.ReplaceAllString(group, "_"), "_")
 	if group == "" {
 		group = "gfx"
 	}
-	return filepath.Join(dataRoot(), "screenshots", "gfx", "errors", group)
+	return filepath.Join(screenshotRoot(), "gfx", group)
 }
 
-// saveErrorScreenshot captures the page on failure only; keeps latest N per group folder.
-func saveErrorScreenshot(page *rod.Page, group, step string) {
+// saveErrorScreenshot captures the page on failure; returns full path written (empty on failure).
+func saveErrorScreenshot(page *rod.Page, group, step string) string {
 	if page == nil {
-		return
+		return ""
 	}
 	img, err := page.Timeout(15 * time.Second).Screenshot(true, nil)
 	if err != nil {
 		log.Printf("[GFX] Screenshot failed (%s/%s): %v", group, step, err)
-		return
+		return ""
 	}
 
 	dir := errorScreenshotDir(group)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		log.Printf("[GFX] Screenshot dir error: %v", err)
-		return
+		return ""
 	}
 
 	step = strings.Trim(safeStepName.ReplaceAllString(step, "_"), "_")
@@ -50,10 +64,11 @@ func saveErrorScreenshot(page *rod.Page, group, step string) {
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, img, 0644); err != nil {
 		log.Printf("[GFX] Screenshot write error: %v", err)
-		return
+		return ""
 	}
 	pruneErrorScreenshots(dir)
-	log.Printf("[GFX] Error screenshot: %s", path)
+	log.Printf("[GFX] Error screenshot → %s", path)
+	return path
 }
 
 type shotFile struct {

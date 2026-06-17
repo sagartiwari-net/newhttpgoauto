@@ -30,7 +30,7 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	}
 
 	extPath := extensionDir()
-	// Headless by default for speed; set GFX_VISIBLE=1 on the worker to show Chrome for debugging.
+	// Headless by default; GFX_VISIBLE=1 shows Chrome for manual debugging on worker Mac.
 	headless := os.Getenv("GFX_VISIBLE") != "1"
 	log.Printf("[GFX] Launching Chrome account=%s headless=%v profile=%s ext=%s",
 		slot.Account.WebsiteID, headless, slot.ProfileDir, extPath)
@@ -41,13 +41,15 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 		Set("disable-setuid-sandbox").
 		Set("disable-dev-shm-usage").
 		Set("disable-gpu").
-		Set("blink-settings", "imagesEnabled=false").
 		Set("disable-popup-blocking").
 		Set("disable-features", "IsolateOrigins,site-per-process").
 		Set("disable-blink-features", "AutomationControlled").
 		Set("disable-extensions-except", extPath).
 		Set("load-extension", extPath).
 		UserDataDir(slot.ProfileDir)
+	if headless {
+		l = l.Set("blink-settings", "imagesEnabled=false")
+	}
 
 	u, err := l.Launch()
 	if err != nil {
@@ -65,8 +67,8 @@ func (s *Session) Close() {
 		return
 	}
 	if os.Getenv("GFX_KEEP_OPEN") == "1" {
-		log.Printf("[GFX] Keeping browser open 45s for inspection (account=%s)", s.slot.Account.WebsiteID)
-		time.Sleep(45 * time.Second)
+		log.Printf("[GFX] Keeping browser open 90s for inspection (account=%s)", s.slot.Account.WebsiteID)
+		time.Sleep(90 * time.Second)
 	}
 	log.Printf("[GFX] Closing Chrome (account=%s)", s.slot.Account.WebsiteID)
 	if s.browser != nil {
