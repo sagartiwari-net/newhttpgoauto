@@ -34,6 +34,15 @@ func Root() string {
 	return filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "gohttpauto", "screenshots")
 }
 
+// EnsureDirs creates Desktop/screenshot and common subfolders on worker startup.
+func EnsureDirs() string {
+	root := Root()
+	for _, sub := range []string{"gfx", "seoshope"} {
+		_ = os.MkdirAll(filepath.Join(root, sub), 0755)
+	}
+	return root
+}
+
 // Dir builds ~/Desktop/screenshot/<tool>/[<group>/].
 func Dir(tool string, group ...string) string {
 	tool = sanitize(tool, "misc")

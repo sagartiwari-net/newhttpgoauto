@@ -10,6 +10,7 @@ import (
 	"gohttpauto/internal/config"
 	"gohttpauto/internal/db"
 	"gohttpauto/internal/dbseed"
+	"gohttpauto/internal/automation/screenshots"
 	"gohttpauto/internal/handlers"
 	"gohttpauto/internal/middleware"
 	"gohttpauto/internal/queue"
@@ -38,6 +39,8 @@ func main() {
 	dbseed.EnsureTasks()
 	handlers.StartLogCleanupLoop()
 	if cfg.Role == "worker" {
+		shotDir := screenshots.EnsureDirs()
+		log.Printf("📸 [WORKER] Error screenshots → %s", shotDir)
 		queue.StartJobPoller()
 		log.Printf("🔧 [ROLE] worker — executing jobs from queue + scheduler")
 	} else {
