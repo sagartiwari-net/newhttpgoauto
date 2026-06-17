@@ -31,26 +31,11 @@ func newSession(ctx context.Context, slot Slot) (*Session, error) {
 	}
 
 	extPath := extensionDir()
-	// Headless by default for speed; set GFX_VISIBLE=1 on the worker to show Chrome for debugging.
-	headless := os.Getenv("GFX_VISIBLE") != "1"
+	headless := gfxHeadless()
 	log.Printf("[GFX] Launching Chrome account=%s headless=%v profile=%s ext=%s",
 		slot.Account.WebsiteID, headless, slot.ProfileDir, extPath)
 
-	l := launcher.New().
-		Headless(headless).
-		Set("no-sandbox").
-		Set("disable-setuid-sandbox").
-		Set("disable-dev-shm-usage").
-		Set("disable-gpu").
-		Set("blink-settings", "imagesEnabled=false").
-		Set("disable-popup-blocking").
-		Set("disable-features", "IsolateOrigins,site-per-process").
-		Set("disable-blink-features", "AutomationControlled").
-		Set("disable-extensions-except", extPath).
-		Set("load-extension", extPath).
-		UserDataDir(slot.ProfileDir)
-
-	u, err := l.Launch()
+	u, err := chromeLauncher(headless, extPath, slot.ProfileDir).Launch()
 	if err != nil {
 		return nil, err
 	}
@@ -117,22 +102,8 @@ func (s *Session) Relaunch(ctx context.Context) error {
 	}
 
 	extPath := extensionDir()
-	headless := os.Getenv("GFX_VISIBLE") != "1"
-	l := launcher.New().
-		Headless(headless).
-		Set("no-sandbox").
-		Set("disable-setuid-sandbox").
-		Set("disable-dev-shm-usage").
-		Set("disable-gpu").
-		Set("blink-settings", "imagesEnabled=false").
-		Set("disable-popup-blocking").
-		Set("disable-features", "IsolateOrigins,site-per-process").
-		Set("disable-blink-features", "AutomationControlled").
-		Set("disable-extensions-except", extPath).
-		Set("load-extension", extPath).
-		UserDataDir(s.slot.ProfileDir)
-
-	u, err := l.Launch()
+	headless := gfxHeadless()
+	u, err := chromeLauncher(headless, extPath, s.slot.ProfileDir).Launch()
 	if err != nil {
 		return err
 	}
@@ -167,4 +138,30 @@ func (s *Session) newPage() *rod.Page {
 		}
 	}
 	return page
+}
+
+func gfxHeadless() bool {
+	// Headless by default on worker. Set GFX_VISIBLE=1 only for local debugging.
+	return os.Getenv("GFX_VISIBLE") != "1"
+}
+
+func chromeLauncher(headless bool, extPath, profileDir string) *launcher.Launcher {
+	l := launcher.New()
+	if headless {
+		l = l.HeadlessNew(true)
+	} else {
+		l = l.Headless(false)
+	}
+	return l.
+		Set("no-sandbox").
+		Set("disable-setuid-sandbox").
+		Set("disable-dev-shm-usage").
+		Set("disable-gpu").
+		Set("blink-settings", "imagesEnabled=false").
+		Set("disable-popup-blocking").
+		Set("disable-features", "IsolateOrigins,site-per-process").
+		Set("disable-blink-features", "AutomationControlled").
+		Set("disable-extensions-except", extPath).
+		Set("load-extension", extPath).
+		UserDataDir(profileDir)
 }

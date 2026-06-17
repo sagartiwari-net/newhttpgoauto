@@ -13,7 +13,7 @@ echo "==> Building worker..."
 cd "$APP_DIR/server"
 go build -buildvcs=false -o gohttpauto ./cmd
 
-echo "==> Refreshing worker launchd plist (GFX_VISIBLE=1 for debugging)..."
+echo "==> Refreshing launchd services (worker + tunnel + awake)..."
 MACOS="$APP_DIR/deploy/macos"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 LOG_DIR="$HOME/Library/Logs/gohttpauto"
@@ -23,10 +23,13 @@ if [ -f "$LOG_DIR/worker.log" ]; then
 fi
 touch "$LOG_DIR/worker.log"
 sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.worker.plist" > "$PLIST_DIR/com.gohttpauto.worker.plist"
+sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.tunnel.plist" > "$PLIST_DIR/com.gohttpauto.tunnel.plist"
+sed "s|__HOME__|$HOME|g" "$MACOS/com.gohttpauto.awake.plist" > "$PLIST_DIR/com.gohttpauto.awake.plist"
 chmod +x "$MACOS/wait-mysql-and-run.sh"
 launchctl bootout "gui/$(id -u)/com.gohttpauto.tunnel" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || true
-sed "s|__HOME__|$HOME|g; s|__APP_DIR__|$APP_DIR|g" "$MACOS/com.gohttpauto.tunnel.plist" > "$PLIST_DIR/com.gohttpauto.tunnel.plist"
+launchctl bootout "gui/$(id -u)/com.gohttpauto.awake" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.awake.plist"
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.tunnel.plist"
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DIR/com.gohttpauto.worker.plist"
 
@@ -37,6 +40,7 @@ if PIDS=$(lsof -ti :4011 2>/dev/null); then
   kill $PIDS 2>/dev/null || true
   sleep 1
 fi
+launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.awake" 2>/dev/null || true
 launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.tunnel" 2>/dev/null || true
 sleep 4
 launchctl kickstart -k "gui/$(id -u)/com.gohttpauto.worker" 2>/dev/null || {
@@ -58,5 +62,8 @@ else
 fi
 
 echo "==> Done. Worker updated from $(git -C "$APP_DIR" rev-parse --short HEAD)"
-echo "    GFX Chrome visible (GFX_VISIBLE=1) — failure screenshots → $HOME/Desktop/screenshot/gfx/"
-echo "    Headless wapas: plist se GFX_VISIBLE hata dena ya 0 karna"
+echo "    GFX Chrome: headless (no window). Debug visible: GFX_VISIBLE=1 in worker plist"
+echo "    Failure screenshots → $HOME/Desktop/screenshot/gfx/"
+echo ""
+echo "    Lid-close / overnight (run once, needs Mac password):"
+echo "    bash $MACOS/configure-overnight.sh"
