@@ -45,37 +45,24 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 	log.Printf("[gfx_portal] Homepage ready: %s — settling 4s...", info.URL)
 	time.Sleep(4 * time.Second)
 
-	rawCookies, err := cookiesForDomain(page, "gfxtoolz.ai")
-	if err != nil {
-		return err
-	}
 	localStorageData := readLocalStorage(page)
-
-	if len(rawCookies) == 0 && len(localStorageData) == 0 {
+	if len(localStorageData) == 0 {
 		saveErrorScreenshot(page, accountID, "portal_empty")
-		return fmt.Errorf("no cookies or localStorage captured from GFX homepage")
+		return fmt.Errorf("no localStorage captured from GFX homepage")
 	}
 
-	var cookieHeaderString string
-	if len(rawCookies) > 0 {
-		var pairs []string
-		for _, c := range rawCookies {
-			pairs = append(pairs, fmt.Sprintf("%s=%s", c.Name, c.Value))
-		}
-		cookieHeaderString = strings.Join(pairs, "; ")
+	referer := info.URL
+	if referer == "" {
+		referer = gfxPortalHomeURL
 	}
 
+	// Same format as GFX extension tools with UseLSPayloadFormat (tools.1clkaccess.store inject).
 	payload := map[string]interface{}{
-		"task_uid":        tool.TaskUID,
-		"account_id":      accountID,
-		"portal_url":      info.URL,
-		"captured_at":     time.Now().UTC().Format(time.RFC3339),
-		"domain":          "gfxtoolz.ai",
-		"cookies":         rawCookies,
-		"localStorage":    localStorageData,
-		"cookies_header":  cookieHeaderString,
-		"cookies_netscape": cookiesToNetscape(rawCookies),
-		"note":            "local file only — not saved to shared_sessions DB",
+		"referer":         referer,
+		"includedFormats": []string{"localStorage"},
+		"storage": map[string]interface{}{
+			"localStorage": localStorageData,
+		},
 	}
 
 	outPath := portalHomepageCookieFile()
@@ -88,7 +75,6 @@ func runPortalHomepage(ctx context.Context, session *Session, tool ToolDef) erro
 		return fmt.Errorf("write portal cookie file: %w", err)
 	}
 
-	log.Printf("[gfx_portal] ✅ Saved homepage session to %s (%d cookies, %d LS keys)",
-		outPath, len(rawCookies), len(localStorageData))
+	log.Printf("[gfx_portal] ✅ Saved homepage localStorage session to %s (%d LS keys)", outPath, len(localStorageData))
 	return nil
 }
